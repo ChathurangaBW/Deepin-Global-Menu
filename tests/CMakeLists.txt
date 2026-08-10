@@ -11,3 +11,9 @@ add_executable(tst-dbusmenutypes
 )
 target_link_libraries(tst-dbusmenutypes PRIVATE dgm-core Qt6::Test)
 add_test(NAME dbusmenutypes COMMAND tst-dbusmenutypes)
+
+add_executable(tst-dbusmenuimporter
+    tst_dbusmenuimporter.cpp
+)
+target_link_libraries(tst-dbusmenuimporter PRIVATE dgm-core Qt6::Test)
+add_test(NAME dbusmenuimporter COMMAND tst-dbusmenuimporter)

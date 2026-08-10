@@ -20,6 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake \
+            dbus-daemon \
             ninja-build \
             qt6-base-dev
 
@@ -35,8 +36,8 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+      - name: Unit and D-Bus integration tests
+        run: dbus-run-session -- ctest --test-dir build --output-on-failure
 
       - name: Inspector CLI smoke
         run: ./build/src/tools/dgm-inspect --help
