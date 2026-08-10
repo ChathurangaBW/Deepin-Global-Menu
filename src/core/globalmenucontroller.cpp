@@ -2,11 +2,14 @@
 
 #include "globalmenucontroller.h"
 
+#include "dbusmenuimporter.h"
+
 namespace dgm {
 
 GlobalMenuController::GlobalMenuController(MenuRegistry *registry, QObject *parent)
     : QObject(parent)
     , m_registry(registry)
+    , m_importer(new DbusMenuImporter(this))
 {
     Q_ASSERT(m_registry);
 
@@ -23,6 +26,13 @@ GlobalMenuController::GlobalMenuController(MenuRegistry *registry, QObject *pare
                     refreshEndpoint();
                 }
             });
+
+    connect(m_importer, &DbusMenuImporter::layoutChanged,
+            this, &GlobalMenuController::menuItemsChanged);
+    connect(m_importer, &DbusMenuImporter::errorStringChanged,
+            this, &GlobalMenuController::menuStatusChanged);
+    connect(m_importer, &DbusMenuImporter::refreshFinished,
+            this, [this](bool) { emit menuStatusChanged(); });
 }
 
 quint32 GlobalMenuController::activeWindowId() const
@@ -56,6 +66,41 @@ QString GlobalMenuController::menuObjectPath() const
     return m_endpoint.objectPath.path();
 }
 
+bool GlobalMenuController::menuReady() const
+{
+    return m_importer->isReady();
+}
+
+uint GlobalMenuController::menuRevision() const
+{
+    return m_importer->revision();
+}
+
+QVariantList GlobalMenuController::menuItems() const
+{
+    return m_importer->topLevelItems();
+}
+
+QString GlobalMenuController::menuError() const
+{
+    return m_importer->errorString();
+}
+
+void GlobalMenuController::refreshMenu()
+{
+    m_importer->refresh();
+}
+
+void GlobalMenuController::triggerMenuAction(int itemId, uint timestamp)
+{
+    m_importer->triggerAction(itemId, timestamp);
+}
+
+void GlobalMenuController::prepareSubmenu(int itemId)
+{
+    m_importer->prepareSubmenu(itemId);
+}
+
 void GlobalMenuController::refreshEndpoint()
 {
     const auto next = m_registry->menuForWindow(m_activeWindowId);
@@ -64,7 +109,14 @@ void GlobalMenuController::refreshEndpoint()
     }
 
     m_endpoint = next;
+    m_importer->setEndpoint(m_endpoint);
+
+    if (m_endpoint.isValid()) {
+        m_importer->refresh();
+    }
+
     emit menuEndpointChanged();
+    emit menuStatusChanged();
 }
 
 } // namespace dgm

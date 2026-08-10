@@ -24,7 +24,7 @@ Application menu exporter
         ^
         |
 Active window tracker
-(X11 / Treeland)
+(X11 / Treeland)        <-- next major milestone
         |
         v
 +-----------------------+
@@ -33,7 +33,7 @@ Active window tracker
         |
         v
 +-----------------------+
-| DBusMenu importer     |  <-- next milestone
+| DBusMenu importer     |
 +-----------------------+
         |
         v
@@ -55,31 +55,41 @@ DDE Shell applet / panel UI
 
 ## Milestone 2 — DBusMenu importer
 
-- Implement `com.canonical.dbusmenu` client support.
-- Fetch root layout and recursively model menu nodes.
-- Handle `LayoutUpdated`, `ItemsPropertiesUpdated`, and action events.
-- Expose a `QAbstractItemModel` suitable for QML.
-- Render real top-level menu labels; never synthesize fake menu entries.
+- [x] Implement `com.canonical.dbusmenu` client support.
+- [x] Fetch the root layout with `GetLayout` and recursively model menu nodes.
+- [x] Handle `LayoutUpdated` by refreshing the exported tree.
+- [x] Handle `ItemsPropertiesUpdated` in-place, with a full refresh fallback for unknown nodes.
+- [x] Send `Event(clicked)` actions.
+- [x] Send `AboutToShow` and refresh when the exporter reports a change.
+- [x] Expose a recursive QVariant tree suitable for QML prototyping.
+- [x] Render real top-level labels in the diagnostic DDE applet; never synthesize fake menu entries.
+- [x] Add `dgm-inspect` for direct service/path or registrar-window inspection.
+- [x] Add DBusMenu data-model tests.
+- [ ] Validate the wire decoder against real GTK/Qt exporters on Deepin.
+- [ ] Replace/augment the QVariant tree with a dedicated QAbstractItemModel if required by final submenu rendering.
+- [ ] Implement interactive recursive submenus in QML.
 
 ## Milestone 3 — Active window tracking
 
 ### X11
 
-- Implement EWMH/XCB `_NET_ACTIVE_WINDOW` tracker.
-- Map the active X11 window ID directly to registrar registrations.
+- [ ] Add an `ActiveWindowTracker` abstraction.
+- [ ] Implement EWMH/XCB `_NET_ACTIVE_WINDOW` tracking.
+- [ ] Map the active X11 window ID directly to registrar registrations.
+- [ ] Add tests around tracker/controller handoff where protocol-independent.
 
 ### Treeland / Wayland
 
-- Identify the supported DDE/Treeland active-toplevel interface.
-- Avoid depending on X11 window IDs in the Wayland-native path.
-- Add an abstraction so the controller receives a stable active-window identity independent of compositor.
+- [ ] Identify the supported DDE/Treeland active-toplevel interface.
+- [ ] Avoid depending on X11 window IDs in the Wayland-native path.
+- [ ] Implement a Treeland tracker behind the same abstraction.
 
 ## Milestone 4 — Native top panel
 
-- Decide between an applet embedded in an existing DDE panel and a dedicated `DPanel` plugin.
-- Left side: launcher/application identity + global menu.
-- Right side: preserve/compose Deepin system indicators rather than reimplementing them where possible.
-- Support multi-monitor placement and configurable panel height.
+- [ ] Decide between an applet embedded in an existing DDE panel and a dedicated `DPanel` plugin after the active-window prototype is running.
+- [ ] Left side: launcher/application identity + global menu.
+- [ ] Right side: preserve/compose Deepin system indicators rather than reimplementing them where possible.
+- [ ] Support multi-monitor placement and configurable panel height.
 
 ## Milestone 5 — Compatibility and polish
 
@@ -98,4 +108,4 @@ Then add visual integration: theme colors, blur/transparency, spacing, overflow 
 
 ## Immediate next engineering task
 
-Implement the DBusMenu importer and add a small command-line diagnostic harness that can print the exported menu tree for a registered window. This provides a protocol-level test before coupling menu rendering to DDE Shell UI.
+Validate `dgm-inspect` against a real exported menu on Deepin, then implement the X11 active-window tracker behind a small abstraction. Once the controller can automatically select the active window's registered endpoint, build the first interactive top-level menu/submenu UI. Treeland support follows behind the same tracker interface.

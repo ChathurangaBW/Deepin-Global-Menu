@@ -2,7 +2,7 @@
 
 A native global application menu for modern Deepin/DDE, targeting the current `dde-shell` plugin architecture.
 
-> **Status:** early development. The first milestone implements the AppMenu registrar/registry foundation and a diagnostic DDE Shell applet. Real DBusMenu rendering and active-window tracking are the next steps.
+> **Status:** active development. The AppMenu registrar foundation and the first real `com.canonical.dbusmenu` importer are implemented on the development branch. Active-window tracking and interactive submenu rendering are next.
 
 ## Goals
 
@@ -14,21 +14,26 @@ A native global application menu for modern Deepin/DDE, targeting the current `d
 
 ## Current architecture
 
-- `dgm-core`: AppMenu registrar, menu endpoint registry, and UI-facing controller.
-- `ds-global-menu`: DDE Shell applet wrapper and diagnostic QML.
-- `tests`: protocol-independent registry tests.
+- `dgm-core`: AppMenu registrar, menu endpoint registry, DBusMenu importer, and UI-facing controller.
+- `ds-global-menu`: DDE Shell applet wrapper; currently renders real imported top-level labels when a menu is selected.
+- `dgm-inspect`: command-line protocol diagnostic tool.
+- `tests`: registry and DBusMenu data-model tests.
 - `docs/PLAN.md`: milestone plan and compatibility strategy.
 
 ## Build prerequisites
 
-The current scaffold expects a modern Deepin development environment containing:
+Core protocol development only needs:
 
 - CMake 3.16+
-- Qt 6 Core, DBus, QML and Quick development packages
+- Qt 6 Core and DBus development packages
+
+The DDE Shell plugin additionally needs:
+
+- Qt 6 QML and Quick development packages
 - installed DDE Shell CMake package (`DDEShellConfig.cmake`)
 - DDE Shell development headers/libraries exporting `Dde::Shell`
 
-Typical development build:
+Full Deepin development build:
 
 ```bash
 cmake -S . -B build
@@ -36,7 +41,33 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The project has not yet been validated against a clean Deepin 25 SDK image; that is part of milestone 1.
+Core/tools-only build, useful outside a Deepin SDK image:
+
+```bash
+cmake -S . -B build-core -DDGM_BUILD_PLUGIN=OFF
+cmake --build build-core
+ctest --test-dir build-core --output-on-failure
+```
+
+## Inspecting a real exported menu
+
+Resolve through a running AppMenu registrar using an X11 window ID:
+
+```bash
+dgm-inspect --window 0x04600007
+```
+
+Or inspect a known exporter directly:
+
+```bash
+dgm-inspect \
+  --service :1.234 \
+  --path /com/canonical/menu/123
+```
+
+Add `--watch` to print the tree again when the exporter updates it.
+
+The project still needs validation against a clean Deepin 25 SDK/system and real GTK/Qt exporters before the current milestone is considered production-ready.
 
 ## Roadmap
 
@@ -44,4 +75,4 @@ See [`docs/PLAN.md`](docs/PLAN.md).
 
 ## License
 
-Project code is intended to be GPL-3.0-or-later. Third-party/reference code must retain its original licensing and attribution.
+Project code is GPL-3.0-or-later. Third-party/reference code must retain its original licensing and attribution.

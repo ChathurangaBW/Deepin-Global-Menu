@@ -5,6 +5,10 @@ add_library(dgm-core STATIC
     menuregistry.h
     appmenuregistrar.cpp
     appmenuregistrar.h
+    dbusmenutypes.cpp
+    dbusmenutypes.h
+    dbusmenuimporter.cpp
+    dbusmenuimporter.h
     globalmenucontroller.cpp
     globalmenucontroller.h
 )
