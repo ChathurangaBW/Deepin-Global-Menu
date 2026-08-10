@@ -1,0 +1,43 @@
+name: Core QA
+
+on:
+  push:
+    branches:
+      - main
+      - agent/**
+  pull_request:
+
+jobs:
+  core-smoke:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Qt 6 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            dbus-daemon \
+            ninja-build \
+            qt6-base-dev
+
+      - name: Configure core, tools, and tests
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DDGM_BUILD_PLUGIN=OFF \
+            -DDGM_BUILD_TOOLS=ON \
+            -DDGM_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit and D-Bus integration tests
+        run: dbus-run-session -- ctest --test-dir build --output-on-failure
+
+      - name: Inspector CLI smoke
+        run: ./build/src/tools/dgm-inspect --help
