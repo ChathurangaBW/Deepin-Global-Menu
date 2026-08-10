@@ -1,0 +1,12 @@
+find_package(Qt6 REQUIRED COMPONENTS Test)
+
+add_executable(tst-menuregistry
+    tst_menuregistry.cpp
+)
+
+target_link_libraries(tst-menuregistry PRIVATE
+    dgm-core
+    Qt6::Test
+)
+
+add_test(NAME menuregistry COMMAND tst-menuregistry)

@@ -1,0 +1,8 @@
+{
+    "Plugin": {
+        "Version": "0.1.0",
+        "Id": "org.deepin.ds.globalmenu",
+        "Url": "main.qml",
+        "ContainmentType": "Applet"
+    }
+}
