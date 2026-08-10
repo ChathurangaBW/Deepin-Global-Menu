@@ -16,7 +16,9 @@ struct MenuEndpoint
 
     [[nodiscard]] bool isValid() const
     {
-        return !service.isEmpty() && objectPath.path() != QStringLiteral("/");
+        // `/` is a valid D-Bus object path. Treat the endpoint as invalid only
+        // when the exporter service is missing or Qt rejected/cleared the path.
+        return !service.isEmpty() && !objectPath.path().isEmpty();
     }
 };
 

@@ -10,9 +10,23 @@ class MenuRegistryTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void defaultEndpointIsInvalid();
+    void rootObjectPathIsValid();
     void registersAndLooksUpWindow();
     void unregistersAllWindowsForService();
 };
+
+void MenuRegistryTest::defaultEndpointIsInvalid()
+{
+    const dgm::MenuEndpoint endpoint;
+    QVERIFY(!endpoint.isValid());
+}
+
+void MenuRegistryTest::rootObjectPathIsValid()
+{
+    const dgm::MenuEndpoint endpoint{QStringLiteral(":1.99"), QDBusObjectPath(QStringLiteral("/"))};
+    QVERIFY(endpoint.isValid());
+}
 
 void MenuRegistryTest::registersAndLooksUpWindow()
 {

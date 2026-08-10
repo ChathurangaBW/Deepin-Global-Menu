@@ -151,6 +151,11 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, DbusMenuLayoutIte
 void registerDbusMenuMetaTypes()
 {
     static const bool registered = [] {
+        // The explicit names match the signatures used by the string-based
+        // QDBusConnection signal hooks in DbusMenuImporter.
+        qRegisterMetaType<DbusMenuItemList>("dgm::DbusMenuItemList");
+        qRegisterMetaType<DbusMenuItemKeysList>("dgm::DbusMenuItemKeysList");
+
         qDBusRegisterMetaType<DbusMenuItem>();
         qDBusRegisterMetaType<DbusMenuItemList>();
         qDBusRegisterMetaType<DbusMenuItemKeys>();
