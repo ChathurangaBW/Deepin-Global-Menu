@@ -2,17 +2,24 @@
 
 #include "globalmenuapplet.h"
 
+#include "ddeactivewindowtracker.h"
 #include "globalmenucontroller.h"
 
 #include <pluginfactory.h>
+
 #include <QDebug>
+#include <QGuiApplication>
 
 GlobalMenuApplet::GlobalMenuApplet(QObject *parent)
     : DApplet(parent)
     , m_registry(this)
     , m_registrar(&m_registry, this)
-    , m_windowTracker(dgm::createActiveWindowTracker(this))
 {
+    if (QGuiApplication::platformName() == QStringLiteral("wayland")) {
+        m_windowTracker = new DdeActiveWindowTracker(this);
+    } else {
+        m_windowTracker = dgm::createActiveWindowTracker(this);
+    }
 }
 
 bool GlobalMenuApplet::load()

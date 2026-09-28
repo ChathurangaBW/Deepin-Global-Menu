@@ -68,11 +68,11 @@ public:
     {
         dgm::GtkActionDescription quit;
         quit.enabled = true;
-        quit.parameterType = QDBusSignature(QString());
+        quit.parameterType = QDBusSignature(QStringLiteral(""));
 
         dgm::GtkActionDescription readOnly;
         readOnly.enabled = false;
-        readOnly.parameterType = QDBusSignature(QString());
+        readOnly.parameterType = QDBusSignature(QStringLiteral(""));
         readOnly.state = {QDBusVariant(QVariant(true))};
 
         descriptions.insert(QStringLiteral("quit"), quit);

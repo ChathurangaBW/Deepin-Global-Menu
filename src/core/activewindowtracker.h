@@ -13,6 +13,7 @@ struct ActiveWindowInfo
     quint32 x11Id = 0;
     qint64 pid = 0;
     QString appId;
+    QString appName;
     QString title;
     QString backend;
 
@@ -33,6 +34,7 @@ struct ActiveWindowInfo
             && lhs.x11Id == rhs.x11Id
             && lhs.pid == rhs.pid
             && lhs.appId == rhs.appId
+            && lhs.appName == rhs.appName
             && lhs.title == rhs.title
             && lhs.backend == rhs.backend
             && lhs.gtkUniqueBusName == rhs.gtkUniqueBusName

@@ -338,7 +338,7 @@ GtkMenuContext GlobalMenuController::gtkContextForActiveWindow() const
     GtkMenuContext context;
     context.busName = m_activeWindowInfo.gtkUniqueBusName;
     context.applicationId = m_activeWindowInfo.appId;
-    context.applicationName = m_activeWindowInfo.appId;
+    context.applicationName = !m_activeWindowInfo.appName.isEmpty()\n        ? m_activeWindowInfo.appName\n        : m_activeWindowInfo.appId;
     context.appActionPath = m_activeWindowInfo.gtkApplicationObjectPath;
     context.windowActionPath = m_activeWindowInfo.gtkWindowObjectPath;
     context.appMenuPath = m_activeWindowInfo.gtkAppMenuObjectPath;
