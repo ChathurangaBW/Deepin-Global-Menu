@@ -5,6 +5,7 @@
 #include "ddeactivewindowtracker.h"
 #include "ddefallbackactions.h"
 #include "globalmenucontroller.h"
+#include "shortcutexecutor.h"
 
 #include <pluginfactory.h>
 
@@ -16,6 +17,7 @@ GlobalMenuApplet::GlobalMenuApplet(QObject *parent)
     , m_registry(this)
     , m_registrar(&m_registry, this)
     , m_fallbackActions(new DdeFallbackActions(this))
+    , m_shortcutExecutor(new ShortcutExecutor(this))
 {
     if (QGuiApplication::platformName() == QStringLiteral("wayland")) {
         m_windowTracker = new DdeActiveWindowTracker(this);
@@ -46,8 +48,18 @@ QObject *GlobalMenuApplet::createProxyMeta()
 {
     auto *controller = new dgm::GlobalMenuController(&m_registry, this);
     controller->setActiveWindowTracker(m_windowTracker);
+    controller->setShortcutActionsAvailable(m_shortcutExecutor->available());
+
     connect(controller, &dgm::GlobalMenuController::fallbackActionRequested,
             m_fallbackActions, &DdeFallbackActions::execute);
+    connect(controller, &dgm::GlobalMenuController::shortcutRequested,
+            m_shortcutExecutor, &ShortcutExecutor::send);
+    connect(m_shortcutExecutor, &ShortcutExecutor::availabilityChanged,
+            controller, [controller, this] {
+                controller->setShortcutActionsAvailable(
+                    m_shortcutExecutor->available());
+            });
+
     return controller;
 }
 

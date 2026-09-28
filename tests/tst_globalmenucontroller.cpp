@@ -53,6 +53,7 @@ class GlobalMenuControllerTest final : public QObject
 private slots:
     void followsTrackerAndRegistry();
     void providesSafeFallbackMenu();
+    void exposesShortcutFallbackWhenAvailable();
 };
 
 void GlobalMenuControllerTest::followsTrackerAndRegistry()
@@ -131,6 +132,56 @@ void GlobalMenuControllerTest::providesSafeFallbackMenu()
     QCOMPARE(actionSpy.count(), 1);
     QCOMPARE(actionSpy.takeFirst().constFirst().toString(),
              QStringLiteral("new-instance"));
+}
+
+void GlobalMenuControllerTest::exposesShortcutFallbackWhenAvailable()
+{
+    dgm::MenuRegistry registry;
+    dgm::GlobalMenuController controller(&registry);
+    FakeActiveWindowTracker tracker;
+    controller.setActiveWindowTracker(&tracker);
+    controller.setShortcutActionsAvailable(true);
+
+    dgm::ActiveWindowInfo info;
+    info.nativeId = 88;
+    info.appId = QStringLiteral("org.example.Browser.desktop");
+    info.appName = QStringLiteral("Example Browser");
+    info.backend = QStringLiteral("treeland");
+    tracker.activateInfo(info);
+
+    QCOMPARE(controller.menuSource(), QStringLiteral("fallback"));
+
+    const auto top = controller.menuItems();
+    QCOMPARE(top.size(), 6);
+    QCOMPARE(top.at(1).toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("File"));
+    QCOMPARE(top.at(2).toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("Edit"));
+    QCOMPARE(top.at(3).toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("View"));
+    QCOMPARE(top.at(5).toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("Help"));
+
+    const auto editChildren =
+        top.at(2).toMap().value(QStringLiteral("children")).toList();
+
+    QVariantMap copyItem;
+    for (const auto &entry : editChildren) {
+        const auto item = entry.toMap();
+        if (item.value(QStringLiteral("label")).toString() == QStringLiteral("Copy")) {
+            copyItem = item;
+            break;
+        }
+    }
+    QVERIFY(!copyItem.isEmpty());
+
+    QSignalSpy shortcutSpy(&controller,
+                           &dgm::GlobalMenuController::shortcutRequested);
+    controller.triggerMenuAction(copyItem.value(QStringLiteral("id")).toInt());
+
+    QCOMPARE(shortcutSpy.count(), 1);
+    QCOMPARE(shortcutSpy.takeFirst().constFirst().toString(),
+             QStringLiteral("Ctrl+C"));
 }
 
 QTEST_GUILESS_MAIN(GlobalMenuControllerTest)

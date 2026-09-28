@@ -38,6 +38,7 @@ public:
     [[nodiscard]] QString activeApplicationId() const;
     void setActiveWindowId(quint32 windowId);
     void setActiveWindowTracker(ActiveWindowTracker *tracker);
+    void setShortcutActionsAvailable(bool available);
 
     [[nodiscard]] QString menuSource() const;
     [[nodiscard]] bool hasMenu() const;
@@ -60,6 +61,7 @@ signals:
     void menuItemsChanged();
     void menuStatusChanged();
     void fallbackActionRequested(const QString &action);
+    void shortcutRequested(const QString &shortcut);
 
 private:
     enum class Source {
@@ -86,6 +88,7 @@ private:
     QVariantList m_fallbackItems;
     QHash<int, QString> m_fallbackActions;
     uint m_fallbackRevision = 0;
+    bool m_shortcutActionsAvailable = false;
     Source m_source = Source::None;
 };
 

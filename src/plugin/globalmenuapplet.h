@@ -11,6 +11,7 @@
 DS_USE_NAMESPACE
 
 class DdeFallbackActions;
+class ShortcutExecutor;
 
 class GlobalMenuApplet final : public DApplet
 {
@@ -30,4 +31,5 @@ private:
     dgm::AppMenuRegistrar m_registrar;
     dgm::ActiveWindowTracker *m_windowTracker = nullptr;
     DdeFallbackActions *m_fallbackActions = nullptr;
+    ShortcutExecutor *m_shortcutExecutor = nullptr;
 };

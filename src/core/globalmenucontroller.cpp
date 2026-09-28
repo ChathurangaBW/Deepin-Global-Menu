@@ -127,6 +127,18 @@ void GlobalMenuController::setActiveWindowTracker(ActiveWindowTracker *tracker)
     setActiveWindowInfo(m_windowTracker->activeWindowInfo());
 }
 
+void GlobalMenuController::setShortcutActionsAvailable(bool available)
+{
+    if (m_shortcutActionsAvailable == available) {
+        return;
+    }
+
+    m_shortcutActionsAvailable = available;
+    if (m_source == Source::Fallback) {
+        rebuildFallbackMenu();
+    }
+}
+
 QString GlobalMenuController::menuSource() const
 {
     switch (m_source) {
@@ -270,7 +282,9 @@ void GlobalMenuController::triggerMenuAction(int itemId, uint timestamp)
         break;
     case Source::Fallback: {
         const auto action = m_fallbackActions.value(itemId);
-        if (!action.isEmpty()) {
+        if (action.startsWith(QStringLiteral("shortcut:"))) {
+            emit shortcutRequested(action.mid(9));
+        } else if (!action.isEmpty()) {
             emit fallbackActionRequested(action);
         }
         break;
@@ -482,7 +496,64 @@ void GlobalMenuController::rebuildFallbackMenu()
     windowMenu.insert(QStringLiteral("children-display"), QStringLiteral("submenu"));
     windowMenu.insert(QStringLiteral("children"), windowChildren);
 
-    const QVariantList nextItems = {applicationMenu, windowMenu};
+    QVariantList nextItems;
+    nextItems.append(applicationMenu);
+
+    auto shortcutItem = [&actionItem](const QString &label, const QString &shortcut) {
+        QVariantMap item = actionItem(label, QStringLiteral("shortcut:") + shortcut);
+        item.insert(QStringLiteral("shortcut"), shortcut);
+        return item;
+    };
+
+    auto makeMenu = [&nextId](const QString &label, const QVariantList &children) {
+        QVariantMap menu;
+        menu.insert(QStringLiteral("id"), ++nextId);
+        menu.insert(QStringLiteral("label"), label);
+        menu.insert(QStringLiteral("enabled"), true);
+        menu.insert(QStringLiteral("visible"), true);
+        menu.insert(QStringLiteral("separator"), false);
+        menu.insert(QStringLiteral("children-display"), QStringLiteral("submenu"));
+        menu.insert(QStringLiteral("children"), children);
+        return menu;
+    };
+
+    if (m_shortcutActionsAvailable) {
+        QVariantList fileChildren;
+        fileChildren.append(shortcutItem(QStringLiteral("New"), QStringLiteral("Ctrl+N")));
+        fileChildren.append(shortcutItem(QStringLiteral("Open…"), QStringLiteral("Ctrl+O")));
+        fileChildren.append(shortcutItem(QStringLiteral("Save"), QStringLiteral("Ctrl+S")));
+        fileChildren.append(shortcutItem(QStringLiteral("Print…"), QStringLiteral("Ctrl+P")));
+        nextItems.append(makeMenu(QStringLiteral("File"), fileChildren));
+
+        QVariantList editChildren;
+        editChildren.append(shortcutItem(QStringLiteral("Undo"), QStringLiteral("Ctrl+Z")));
+        editChildren.append(shortcutItem(QStringLiteral("Redo"), QStringLiteral("Ctrl+Y")));
+        editChildren.append(separator());
+        editChildren.append(shortcutItem(QStringLiteral("Cut"), QStringLiteral("Ctrl+X")));
+        editChildren.append(shortcutItem(QStringLiteral("Copy"), QStringLiteral("Ctrl+C")));
+        editChildren.append(shortcutItem(QStringLiteral("Paste"), QStringLiteral("Ctrl+V")));
+        editChildren.append(shortcutItem(QStringLiteral("Select All"), QStringLiteral("Ctrl+A")));
+        editChildren.append(separator());
+        editChildren.append(shortcutItem(QStringLiteral("Find…"), QStringLiteral("Ctrl+F")));
+        nextItems.append(makeMenu(QStringLiteral("Edit"), editChildren));
+
+        QVariantList viewChildren;
+        viewChildren.append(shortcutItem(QStringLiteral("Full Screen"), QStringLiteral("F11")));
+        viewChildren.append(separator());
+        viewChildren.append(shortcutItem(QStringLiteral("Zoom In"), QStringLiteral("Ctrl+=")));
+        viewChildren.append(shortcutItem(QStringLiteral("Zoom Out"), QStringLiteral("Ctrl+-")));
+        viewChildren.append(shortcutItem(QStringLiteral("Reset Zoom"), QStringLiteral("Ctrl+0")));
+        nextItems.append(makeMenu(QStringLiteral("View"), viewChildren));
+    }
+
+    nextItems.append(windowMenu);
+
+    if (m_shortcutActionsAvailable) {
+        QVariantList helpChildren;
+        helpChildren.append(shortcutItem(QStringLiteral("Help"), QStringLiteral("F1")));
+        nextItems.append(makeMenu(QStringLiteral("Help"), helpChildren));
+    }
+
     if (m_fallbackItems == nextItems) {
         return;
     }
