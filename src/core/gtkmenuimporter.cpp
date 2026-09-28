@@ -109,6 +109,11 @@ void GtkMenuImporter::refresh()
     }
 
     QSet<QString> actionPaths;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    // Qt before 6.8 incorrectly rejects the empty D-Bus signature used by
+    // zero-parameter GAction descriptions. Menu hierarchy and activation
+    // still work there; only DescribeAll-backed state/action fallback is
+    // disabled.
     if (!m_context.appActionPath.isEmpty()) {
         actionPaths.insert(m_context.appActionPath);
     }
@@ -118,6 +123,7 @@ void GtkMenuImporter::refresh()
     if (!m_context.menubarPath.isEmpty()) {
         actionPaths.insert(m_context.menubarPath);
     }
+#endif
 
     m_pendingRequests = menuPaths.size() + actionPaths.size();
     if (m_pendingRequests == 0) {

@@ -68,12 +68,23 @@ public:
     {
         dgm::GtkActionDescription quit;
         quit.enabled = true;
-        quit.parameterType = QDBusSignature(QStringLiteral(""));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        quit.parameterType = QDBusSignature();
 
         dgm::GtkActionDescription readOnly;
         readOnly.enabled = false;
-        readOnly.parameterType = QDBusSignature(QStringLiteral(""));
+        readOnly.parameterType = QDBusSignature();
         readOnly.state = {QDBusVariant(QVariant(true))};
+#else
+        // Qt < 6.8 cannot marshal the valid empty D-Bus signature used by a
+        // zero-parameter GAction. The importer deliberately skips DescribeAll
+        // on those Qt versions, so keep the fake service marshalable.
+        quit.parameterType = QDBusSignature(QStringLiteral("s"));
+
+        dgm::GtkActionDescription readOnly;
+        readOnly.enabled = false;
+        readOnly.parameterType = QDBusSignature(QStringLiteral("s"));
+#endif
 
         descriptions.insert(QStringLiteral("quit"), quit);
         descriptions.insert(QStringLiteral("read-only"), readOnly);
@@ -177,10 +188,14 @@ void GtkMenuImporterTest::importsGtkMenuAndActivatesActions()
 
     const auto readOnly = children.at(1).toMap();
     QCOMPARE(readOnly.value(QStringLiteral("label")).toString(), QStringLiteral("Read Only"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     QVERIFY(!readOnly.value(QStringLiteral("enabled")).toBool());
     QCOMPARE(readOnly.value(QStringLiteral("toggle-type")).toString(),
              QStringLiteral("checkmark"));
     QCOMPARE(readOnly.value(QStringLiteral("toggle-state")).toInt(), 1);
+#else
+    QVERIFY(readOnly.value(QStringLiteral("enabled")).toBool());
+#endif
 
     QSignalSpy actionSpy(&m_actions, &FakeGtkActions::activated);
     importer.triggerAction(quit.value(QStringLiteral("id")).toInt());
@@ -190,6 +205,9 @@ void GtkMenuImporterTest::importsGtkMenuAndActivatesActions()
 
 void GtkMenuImporterTest::fallsBackToActionGroups()
 {
+#if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
+    QSKIP("GTK action-only fallback requires Qt 6.8+ empty D-Bus signature support");
+#else
     dgm::GtkMenuImporter importer;
 
     dgm::GtkMenuContext context;
@@ -220,6 +238,7 @@ void GtkMenuImporterTest::fallsBackToActionGroups()
         }
     }
     QVERIFY(foundApplicationMenu);
+#endif
 }
 
 QTEST_GUILESS_MAIN(GtkMenuImporterTest)
