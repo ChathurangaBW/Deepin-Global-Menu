@@ -44,6 +44,11 @@ MenuEndpoint MenuRegistry::menuForWindow(quint32 windowId) const
     return m_windows.value(windowId);
 }
 
+const QHash<quint32, MenuEndpoint> &MenuRegistry::entries() const
+{
+    return m_windows;
+}
+
 bool MenuRegistry::contains(quint32 windowId) const
 {
     return m_windows.contains(windowId);

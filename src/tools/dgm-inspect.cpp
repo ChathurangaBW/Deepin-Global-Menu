@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("dgm-inspect"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.2.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("0.4.0"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Inspect a com.canonical.dbusmenu tree"));

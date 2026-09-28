@@ -6,6 +6,12 @@ add_executable(tst-menuregistry
 target_link_libraries(tst-menuregistry PRIVATE dgm-core Qt6::Test)
 add_test(NAME menuregistry COMMAND tst-menuregistry)
 
+add_executable(tst-appmenuregistrar
+    tst_appmenuregistrar.cpp
+)
+target_link_libraries(tst-appmenuregistrar PRIVATE dgm-core Qt6::Test)
+add_test(NAME appmenuregistrar COMMAND tst-appmenuregistrar)
+
 add_executable(tst-dbusmenutypes
     tst_dbusmenutypes.cpp
 )
@@ -17,3 +23,15 @@ add_executable(tst-dbusmenuimporter
 )
 target_link_libraries(tst-dbusmenuimporter PRIVATE dgm-core Qt6::Test)
 add_test(NAME dbusmenuimporter COMMAND tst-dbusmenuimporter)
+
+add_executable(tst-gtkmenuimporter
+    tst_gtkmenuimporter.cpp
+)
+target_link_libraries(tst-gtkmenuimporter PRIVATE dgm-core Qt6::Test)
+add_test(NAME gtkmenuimporter COMMAND tst-gtkmenuimporter)
+
+add_executable(tst-globalmenucontroller
+    tst_globalmenucontroller.cpp
+)
+target_link_libraries(tst-globalmenucontroller PRIVATE dgm-core Qt6::Test)
+add_test(NAME globalmenucontroller COMMAND tst-globalmenucontroller)

@@ -2,12 +2,16 @@
 
 #pragma once
 
+#include "activewindowtracker.h"
 #include "appmenuregistrar.h"
 #include "menuregistry.h"
 
 #include <applet.h>
 
 DS_USE_NAMESPACE
+
+class DdeFallbackActions;
+class ShortcutExecutor;
 
 class GlobalMenuApplet final : public DApplet
 {
@@ -25,4 +29,7 @@ protected:
 private:
     dgm::MenuRegistry m_registry;
     dgm::AppMenuRegistrar m_registrar;
+    dgm::ActiveWindowTracker *m_windowTracker = nullptr;
+    DdeFallbackActions *m_fallbackActions = nullptr;
+    ShortcutExecutor *m_shortcutExecutor = nullptr;
 };

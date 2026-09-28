@@ -2,8 +2,11 @@
 
 #pragma once
 
+#include "activewindowtracker.h"
+#include "gtkmenutypes.h"
 #include "menuregistry.h"
 
+#include <QHash>
 #include <QObject>
 #include <QString>
 #include <QVariantList>
@@ -11,11 +14,15 @@
 namespace dgm {
 
 class DbusMenuImporter;
+class GtkMenuImporter;
+struct GtkMenuContext;
 
 class GlobalMenuController final : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(quint32 activeWindowId READ activeWindowId WRITE setActiveWindowId NOTIFY activeWindowIdChanged)
+    Q_PROPERTY(QString activeApplicationId READ activeApplicationId NOTIFY activeWindowIdChanged)
+    Q_PROPERTY(QString menuSource READ menuSource NOTIFY menuSourceChanged)
     Q_PROPERTY(bool hasMenu READ hasMenu NOTIFY menuEndpointChanged)
     Q_PROPERTY(QString menuService READ menuService NOTIFY menuEndpointChanged)
     Q_PROPERTY(QString menuObjectPath READ menuObjectPath NOTIFY menuEndpointChanged)
@@ -28,8 +35,12 @@ public:
     explicit GlobalMenuController(MenuRegistry *registry, QObject *parent = nullptr);
 
     [[nodiscard]] quint32 activeWindowId() const;
+    [[nodiscard]] QString activeApplicationId() const;
     void setActiveWindowId(quint32 windowId);
+    void setActiveWindowTracker(ActiveWindowTracker *tracker);
+    void setShortcutActionsAvailable(bool available);
 
+    [[nodiscard]] QString menuSource() const;
     [[nodiscard]] bool hasMenu() const;
     [[nodiscard]] QString menuService() const;
     [[nodiscard]] QString menuObjectPath() const;
@@ -45,17 +56,40 @@ public:
 
 signals:
     void activeWindowIdChanged();
+    void menuSourceChanged();
     void menuEndpointChanged();
     void menuItemsChanged();
     void menuStatusChanged();
+    void fallbackActionRequested(const QString &action);
+    void shortcutRequested(const QString &shortcut);
 
 private:
-    void refreshEndpoint();
+    enum class Source {
+        None,
+        DbusMenu,
+        Gtk,
+        Fallback
+    };
+
+    void setActiveWindowInfo(const ActiveWindowInfo &info);
+    void refreshSource();
+    void selectSource(Source source);
+    GtkMenuContext gtkContextForActiveWindow() const;
+    void tryGtkFallback();
+    void selectFallback();
+    void rebuildFallbackMenu();
 
     MenuRegistry *m_registry = nullptr;
     DbusMenuImporter *m_importer = nullptr;
-    quint32 m_activeWindowId = 0;
+    GtkMenuImporter *m_gtkImporter = nullptr;
+    ActiveWindowTracker *m_windowTracker = nullptr;
+    ActiveWindowInfo m_activeWindowInfo;
     MenuEndpoint m_endpoint;
+    QVariantList m_fallbackItems;
+    QHash<int, QString> m_fallbackActions;
+    uint m_fallbackRevision = 0;
+    bool m_shortcutActionsAvailable = false;
+    Source m_source = Source::None;
 };
 
 } // namespace dgm

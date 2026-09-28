@@ -2,11 +2,31 @@
 
 #include "appmenuregistrar.h"
 
+#include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
+#include <QDBusMetaType>
 #include <QDebug>
 
+#include <algorithm>
+
 namespace dgm {
+
+QDBusArgument &operator<<(QDBusArgument &argument, const RegistrarMenu &menu)
+{
+    argument.beginStructure();
+    argument << menu.windowId << menu.service << menu.objectPath;
+    argument.endStructure();
+    return argument;
+}
+
+const QDBusArgument &operator>>(const QDBusArgument &argument, RegistrarMenu &menu)
+{
+    argument.beginStructure();
+    argument >> menu.windowId >> menu.service >> menu.objectPath;
+    argument.endStructure();
+    return argument;
+}
 
 namespace {
 constexpr auto kRegistrarService = "com.canonical.AppMenu.Registrar";
@@ -18,6 +38,9 @@ AppMenuRegistrar::AppMenuRegistrar(MenuRegistry *registry, QObject *parent)
     , m_registry(registry)
 {
     Q_ASSERT(m_registry);
+    qRegisterMetaType<RegistrarMenuList>("dgm::RegistrarMenuList");
+    qDBusRegisterMetaType<RegistrarMenu>();
+    qDBusRegisterMetaType<RegistrarMenuList>();
 }
 
 AppMenuRegistrar::~AppMenuRegistrar()
@@ -51,13 +74,20 @@ bool AppMenuRegistrar::start()
     }
 
     if (auto *iface = bus.interface()) {
-        connect(iface, &QDBusConnectionInterface::serviceOwnerChanged,
-                this,
-                [this](const QString &service, const QString &oldOwner, const QString &newOwner) {
-                    if (!oldOwner.isEmpty() && newOwner.isEmpty()) {
-                        m_registry->unregisterService(service);
-                    }
-                });
+        if (m_ownerChangedConnection) {
+            disconnect(m_ownerChangedConnection);
+        }
+        m_ownerChangedConnection = connect(
+            iface,
+            &QDBusConnectionInterface::serviceOwnerChanged,
+            this,
+            [this](const QString &service,
+                   const QString &oldOwner,
+                   const QString &newOwner) {
+                if (!oldOwner.isEmpty() && newOwner.isEmpty()) {
+                    m_registry->unregisterService(service);
+                }
+            });
     }
 
     m_running = true;
@@ -71,6 +101,11 @@ void AppMenuRegistrar::stop()
     }
 
     auto bus = QDBusConnection::sessionBus();
+    if (m_ownerChangedConnection) {
+        disconnect(m_ownerChangedConnection);
+        m_ownerChangedConnection = {};
+    }
+
     bus.unregisterObject(QString::fromLatin1(kRegistrarPath));
     bus.unregisterService(QString::fromLatin1(kRegistrarService));
     m_running = false;
@@ -110,6 +145,26 @@ void AppMenuRegistrar::GetMenuForWindow(quint32 windowId,
     const auto endpoint = m_registry->menuForWindow(windowId);
     service = endpoint.service;
     menuObjectPath = endpoint.objectPath;
+}
+
+RegistrarMenuList AppMenuRegistrar::GetMenus() const
+{
+    RegistrarMenuList menus;
+    menus.reserve(m_registry->entries().size());
+
+    for (auto it = m_registry->entries().cbegin();
+         it != m_registry->entries().cend();
+         ++it) {
+        menus.append(RegistrarMenu{it.key(),
+                                   it.value().service,
+                                   it.value().objectPath});
+    }
+
+    std::sort(menus.begin(), menus.end(),
+              [](const RegistrarMenu &lhs, const RegistrarMenu &rhs) {
+                  return lhs.windowId < rhs.windowId;
+              });
+    return menus;
 }
 
 } // namespace dgm

@@ -15,13 +15,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install Qt 6 build dependencies
+      - name: Install Qt 6 and X11 build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake \
             dbus-daemon \
+            libxcb1-dev \
             ninja-build \
+            pkg-config \
             qt6-base-dev
 
       - name: Configure core, tools, and tests
@@ -30,6 +32,7 @@ jobs:
             -DDGM_BUILD_PLUGIN=OFF \
             -DDGM_BUILD_TOOLS=ON \
             -DDGM_BUILD_TESTS=ON \
+            -DDGM_ENABLE_X11_TRACKER=ON \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
 
@@ -41,3 +44,49 @@ jobs:
 
       - name: Inspector CLI smoke
         run: ./build/src/tools/dgm-inspect --help
+
+  deepin25-plugin:
+    runs-on: ubuntu-24.04
+    container:
+      image: linuxdeepin/deepin:25
+
+    steps:
+      - name: Install Deepin 25 development dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            dbus-daemon \
+            git \
+            libdde-shell-dev \
+            libdtk6gui-dev \
+            libxcb1-dev \
+            libxkbcommon-dev \
+            libxtst-dev \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-wayland-dev \
+            qt6-wayland-dev-tools
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure full Deepin plugin build
+        run: |
+          cmake -S . -B build-deepin -G Ninja \
+            -DDGM_BUILD_PLUGIN=ON \
+            -DDGM_BUILD_TOOLS=ON \
+            -DDGM_BUILD_TESTS=ON \
+            -DDGM_ENABLE_X11_TRACKER=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
+
+      - name: Build full plugin
+        run: cmake --build build-deepin --parallel
+
+      - name: Unit and D-Bus integration tests
+        run: dbus-run-session -- ctest --test-dir build-deepin --output-on-failure
