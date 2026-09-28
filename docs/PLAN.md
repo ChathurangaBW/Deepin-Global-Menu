@@ -24,7 +24,7 @@ Application menu exporter
         ^
         |
 Active window tracker
-(X11 / Treeland)        <-- next major milestone
+(X11 / Treeland)
         |
         v
 +-----------------------+
@@ -48,12 +48,12 @@ DDE Shell applet / panel UI
 - [x] Implement initial `com.canonical.AppMenu.Registrar` session-bus service.
 - [x] Remove stale window registrations when a DBus client disappears.
 - [x] Add shell-facing controller properties.
-- [x] Add a minimal DDE Shell applet and diagnostic QML.
+- [x] Add a minimal DDE Shell applet.
 - [x] Add registry unit tests.
 - [ ] Validate build on Deepin 25 with the packaged DDE Shell development files.
 - [ ] Validate registrar introspection against GTK/Qt exporters.
 
-## Milestone 2 — DBusMenu importer
+## Milestone 2 — DBusMenu importer and UI
 
 - [x] Implement `com.canonical.dbusmenu` client support.
 - [x] Fetch the root layout with `GetLayout` and recursively model menu nodes.
@@ -61,35 +61,40 @@ DDE Shell applet / panel UI
 - [x] Handle `ItemsPropertiesUpdated` in-place, with a full refresh fallback for unknown nodes.
 - [x] Send `Event(clicked)` actions.
 - [x] Send `AboutToShow` and refresh when the exporter reports a change.
-- [x] Expose a recursive QVariant tree suitable for QML prototyping.
-- [x] Render real top-level labels in the diagnostic DDE applet; never synthesize fake menu entries.
+- [x] Expose a recursive QVariant tree suitable for QML.
 - [x] Add `dgm-inspect` for direct service/path or registrar-window inspection.
 - [x] Add DBusMenu data-model tests.
-- [ ] Validate the wire decoder against real GTK/Qt exporters on Deepin.
-- [ ] Replace/augment the QVariant tree with a dedicated QAbstractItemModel if required by final submenu rendering.
-- [ ] Implement interactive recursive submenus in QML.
+- [x] Implement interactive top-level menus and recursive submenus in QML.
+- [x] Render separators, disabled items, and check/radio toggle state.
+- [ ] Validate the wire decoder and interactive menu behavior against real GTK/Qt exporters on Deepin.
+- [ ] Replace/augment the QVariant tree with a dedicated QAbstractItemModel if profiling or final UI behavior requires it.
 
 ## Milestone 3 — Active window tracking
 
-### X11
+### X11 / XWayland
 
-- [ ] Add an `ActiveWindowTracker` abstraction.
-- [ ] Implement EWMH/XCB `_NET_ACTIVE_WINDOW` tracking.
-- [ ] Map the active X11 window ID directly to registrar registrations.
-- [ ] Add tests around tracker/controller handoff where protocol-independent.
+- [x] Add an `ActiveWindowTracker` abstraction.
+- [x] Implement EWMH/XCB `_NET_ACTIVE_WINDOW` tracking.
+- [x] Map the active X11 window ID directly to registrar registrations.
+- [x] Add protocol-independent tests around tracker/controller handoff.
+- [ ] Validate focus changes, transient windows, and XWayland behavior on Deepin 25.
 
 ### Treeland / Wayland
 
 - [ ] Identify the supported DDE/Treeland active-toplevel interface.
 - [ ] Avoid depending on X11 window IDs in the Wayland-native path.
 - [ ] Implement a Treeland tracker behind the same abstraction.
+- [ ] Map Wayland-native application/toplevel identity to exported global-menu endpoints.
+
+Treeland protocol extensions are still experimental upstream, so this backend should be isolated behind the tracker abstraction rather than leaking compositor-specific details into the controller.
 
 ## Milestone 4 — Native top panel
 
-- [ ] Decide between an applet embedded in an existing DDE panel and a dedicated `DPanel` plugin after the active-window prototype is running.
+- [ ] Decide between an applet embedded in an existing DDE panel and a dedicated `DPanel` plugin after real-system validation.
 - [ ] Left side: launcher/application identity + global menu.
 - [ ] Right side: preserve/compose Deepin system indicators rather than reimplementing them where possible.
 - [ ] Support multi-monitor placement and configurable panel height.
+- [ ] Add overflow behavior for applications with very wide menu bars.
 
 ## Milestone 5 — Compatibility and polish
 
@@ -104,8 +109,8 @@ Test separately:
 - Chromium
 - Electron applications
 
-Then add visual integration: theme colors, blur/transparency, spacing, overflow handling, keyboard navigation, and accessibility.
+Then add visual integration: theme colors, blur/transparency, spacing, keyboard navigation, accessibility, localization, and packaging.
 
 ## Immediate next engineering task
 
-Validate `dgm-inspect` against a real exported menu on Deepin, then implement the X11 active-window tracker behind a small abstraction. Once the controller can automatically select the active window's registered endpoint, build the first interactive top-level menu/submenu UI. Treeland support follows behind the same tracker interface.
+Run the X11 prototype on a clean Deepin 25 system and validate automatic focus-to-menu switching against real Qt and GTK exporters. Fix protocol/runtime differences found there before starting the Treeland-native tracker. After that, decide whether the final shell surface should remain an applet or move to a dedicated panel plugin.

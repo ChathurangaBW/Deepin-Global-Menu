@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(deepin-global-menu
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "Native global application menu for modern Deepin/DDE"
     LANGUAGES CXX
 )
@@ -19,6 +19,14 @@ find_package(Qt6 REQUIRED COMPONENTS Core DBus)
 option(DGM_BUILD_PLUGIN "Build the DDE Shell plugin" ON)
 option(DGM_BUILD_TOOLS "Build diagnostic tools" ON)
 option(DGM_BUILD_TESTS "Build unit tests" ON)
+option(DGM_ENABLE_X11_TRACKER "Build the X11 active-window tracker when XCB is available" ON)
+
+if(DGM_ENABLE_X11_TRACKER AND UNIX AND NOT APPLE)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(XCB QUIET IMPORTED_TARGET xcb)
+    endif()
+endif()
 
 add_subdirectory(src/core)
 

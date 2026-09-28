@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "activewindowtracker.h"
 #include "appmenuregistrar.h"
 #include "menuregistry.h"
 
@@ -25,4 +26,5 @@ protected:
 private:
     dgm::MenuRegistry m_registry;
     dgm::AppMenuRegistrar m_registrar;
+    dgm::ActiveWindowTracker *m_windowTracker = nullptr;
 };

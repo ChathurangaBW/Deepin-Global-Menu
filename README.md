@@ -2,7 +2,7 @@
 
 A native global application menu for modern Deepin/DDE, targeting the current `dde-shell` plugin architecture.
 
-> **Status:** active development. The AppMenu registrar foundation and the first real `com.canonical.dbusmenu` importer are implemented on the development branch. Active-window tracking and interactive submenu rendering are next.
+> **Status:** X11 prototype milestone. The AppMenu registrar, DBusMenu importer, automatic X11 active-window tracking, and interactive recursive menu UI are implemented. Deepin 25 validation and a native Treeland/Wayland active-window backend are still required before calling this production-ready.
 
 ## Goals
 
@@ -14,18 +14,26 @@ A native global application menu for modern Deepin/DDE, targeting the current `d
 
 ## Current architecture
 
-- `dgm-core`: AppMenu registrar, menu endpoint registry, DBusMenu importer, and UI-facing controller.
-- `ds-global-menu`: DDE Shell applet wrapper; currently renders real imported top-level labels when a menu is selected.
+- `dgm-core`: AppMenu registrar, menu endpoint registry, DBusMenu importer, active-window tracker abstraction, and UI-facing controller.
+- X11 backend: watches EWMH `_NET_ACTIVE_WINDOW` through XCB and selects the matching registered DBusMenu endpoint automatically.
+- `ds-global-menu`: DDE Shell applet wrapper with clickable top-level menus and recursive submenus.
 - `dgm-inspect`: command-line protocol diagnostic tool.
-- `tests`: registry and DBusMenu data-model tests.
+- `tests`: registry, importer, data-model, and tracker/controller handoff tests.
 - `docs/PLAN.md`: milestone plan and compatibility strategy.
 
 ## Build prerequisites
 
-Core protocol development only needs:
+Core protocol development needs:
 
 - CMake 3.16+
 - Qt 6 Core and DBus development packages
+
+Automatic X11 active-window tracking additionally uses:
+
+- `pkg-config`
+- XCB development files (`libxcb1-dev` on Debian/Ubuntu/Deepin)
+
+If XCB is unavailable, the core still builds, but automatic active-window selection is disabled.
 
 The DDE Shell plugin additionally needs:
 
@@ -49,6 +57,20 @@ cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
 
+To explicitly disable the X11 tracker:
+
+```bash
+cmake -S . -B build-core -DDGM_BUILD_PLUGIN=OFF -DDGM_ENABLE_X11_TRACKER=OFF
+```
+
+## Runtime behavior
+
+On X11, the applet watches the root window's `_NET_ACTIVE_WINDOW` property. When focus changes, the controller looks up that window ID in `com.canonical.AppMenu.Registrar`, imports the matching `com.canonical.dbusmenu` tree, and exposes it to the QML applet.
+
+The QML layer renders top-level menu buttons, recursive submenus, separators, enabled/disabled state, and check/radio toggle state. Actions are sent back through DBusMenu `Event(clicked)`, while submenu opening triggers `AboutToShow`.
+
+On a Wayland/Treeland session, XWayland applications may still be discoverable when an X11 display is available, but a native Treeland active-toplevel backend is not implemented yet.
+
 ## Inspecting a real exported menu
 
 Resolve through a running AppMenu registrar using an X11 window ID:
@@ -67,7 +89,9 @@ dgm-inspect \
 
 Add `--watch` to print the tree again when the exporter updates it.
 
-The project still needs validation against a clean Deepin 25 SDK/system and real GTK/Qt exporters before the current milestone is considered production-ready.
+## Validation still required
+
+Before treating the project as release-ready, validate it on a clean Deepin 25 installation against real exporters from GTK, Qt, LibreOffice, Firefox/Chromium, and Electron applications. The Treeland/Wayland native active-window path also remains outstanding.
 
 ## Roadmap
 

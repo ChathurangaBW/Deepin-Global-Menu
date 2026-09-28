@@ -17,3 +17,9 @@ add_executable(tst-dbusmenuimporter
 )
 target_link_libraries(tst-dbusmenuimporter PRIVATE dgm-core Qt6::Test)
 add_test(NAME dbusmenuimporter COMMAND tst-dbusmenuimporter)
+
+add_executable(tst-globalmenucontroller
+    tst_globalmenucontroller.cpp
+)
+target_link_libraries(tst-globalmenucontroller PRIVATE dgm-core Qt6::Test)
+add_test(NAME globalmenucontroller COMMAND tst-globalmenucontroller)

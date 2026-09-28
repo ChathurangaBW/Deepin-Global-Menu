@@ -2,6 +2,7 @@
 
 #include "globalmenucontroller.h"
 
+#include "activewindowtracker.h"
 #include "dbusmenuimporter.h"
 
 namespace dgm {
@@ -49,6 +50,35 @@ void GlobalMenuController::setActiveWindowId(quint32 windowId)
     m_activeWindowId = windowId;
     emit activeWindowIdChanged();
     refreshEndpoint();
+}
+
+void GlobalMenuController::setActiveWindowTracker(ActiveWindowTracker *tracker)
+{
+    if (m_windowTracker == tracker) {
+        return;
+    }
+
+    if (m_windowTracker) {
+        disconnect(m_windowTracker, nullptr, this, nullptr);
+    }
+
+    m_windowTracker = tracker;
+    if (!m_windowTracker) {
+        setActiveWindowId(0);
+        return;
+    }
+
+    connect(m_windowTracker, &ActiveWindowTracker::activeWindowIdChanged,
+            this, &GlobalMenuController::setActiveWindowId);
+    connect(m_windowTracker, &QObject::destroyed,
+            this, [this, tracker] {
+                if (m_windowTracker == tracker) {
+                    m_windowTracker = nullptr;
+                    setActiveWindowId(0);
+                }
+            });
+
+    setActiveWindowId(m_windowTracker->activeWindowId());
 }
 
 bool GlobalMenuController::hasMenu() const

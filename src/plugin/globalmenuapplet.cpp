@@ -11,13 +11,18 @@ GlobalMenuApplet::GlobalMenuApplet(QObject *parent)
     : DApplet(parent)
     , m_registry(this)
     , m_registrar(&m_registry, this)
+    , m_windowTracker(dgm::createActiveWindowTracker(this))
 {
 }
 
 bool GlobalMenuApplet::load()
 {
     if (!m_registrar.start()) {
-        qWarning() << "Deepin Global Menu: registrar did not start; the applet will load in diagnostic mode";
+        qWarning() << "Deepin Global Menu: registrar did not start; another registrar may already own the service";
+    }
+
+    if (!m_windowTracker || !m_windowTracker->start()) {
+        qWarning() << "Deepin Global Menu: automatic active-window tracking is unavailable in this session";
     }
 
     return DApplet::load();
@@ -30,7 +35,9 @@ bool GlobalMenuApplet::init()
 
 QObject *GlobalMenuApplet::createProxyMeta()
 {
-    return new dgm::GlobalMenuController(&m_registry, this);
+    auto *controller = new dgm::GlobalMenuController(&m_registry, this);
+    controller->setActiveWindowTracker(m_windowTracker);
+    return controller;
 }
 
 D_APPLET_CLASS(GlobalMenuApplet)

@@ -8,15 +8,15 @@ import org.deepin.ds 1.0
 AppletItem {
     id: root
 
-    implicitWidth: content.implicitWidth + 20
+    implicitWidth: content.implicitWidth + 16
     implicitHeight: 30
 
     RowLayout {
         id: content
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
-        spacing: 10
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        spacing: 2
 
         Label {
             visible: !Applet.menuReady
@@ -27,13 +27,37 @@ AppletItem {
         Repeater {
             model: Applet.menuItems
 
-            delegate: Label {
+            delegate: ToolButton {
+                id: menuButton
+
                 required property var modelData
+
                 visible: modelData.visible !== false && modelData.separator !== true
                 enabled: modelData.enabled !== false
-                text: modelData.label
-                opacity: enabled ? 1.0 : 0.45
-                font.bold: false
+                text: modelData.label || ""
+                flat: true
+                focusPolicy: Qt.StrongFocus
+                Layout.preferredHeight: 28
+
+                onClicked: {
+                    const children = modelData.children || []
+                    const hasSubmenu = modelData["children-display"] === "submenu"
+                                       || children.length > 0
+
+                    if (hasSubmenu) {
+                        submenu.popup(menuButton)
+                    } else {
+                        Applet.triggerMenuAction(modelData.id, 0)
+                    }
+                }
+
+                DbusMenu {
+                    id: submenu
+                    title: menuButton.text
+                    items: menuButton.modelData.children || []
+                    controller: Applet
+                    sourceItemId: menuButton.modelData.id
+                }
             }
         }
 
@@ -48,8 +72,11 @@ AppletItem {
     ToolTip.text: Applet.menuError.length > 0
                   ? Applet.menuError
                   : (Applet.hasMenu
-                     ? ("DBusMenu revision " + Applet.menuRevision + " · " + Applet.menuObjectPath)
-                     : "Waiting for active-window tracking to select a registered menu")
+                     ? ("Window 0x"
+                        + Applet.activeWindowId.toString(16)
+                        + " · DBusMenu revision "
+                        + Applet.menuRevision)
+                     : "Waiting for the active application's exported menu")
 
     HoverHandler {
         id: hover

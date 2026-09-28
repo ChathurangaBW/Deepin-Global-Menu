@@ -10,6 +10,7 @@
 
 namespace dgm {
 
+class ActiveWindowTracker;
 class DbusMenuImporter;
 
 class GlobalMenuController final : public QObject
@@ -29,6 +30,7 @@ public:
 
     [[nodiscard]] quint32 activeWindowId() const;
     void setActiveWindowId(quint32 windowId);
+    void setActiveWindowTracker(ActiveWindowTracker *tracker);
 
     [[nodiscard]] bool hasMenu() const;
     [[nodiscard]] QString menuService() const;
@@ -54,6 +56,7 @@ private:
 
     MenuRegistry *m_registry = nullptr;
     DbusMenuImporter *m_importer = nullptr;
+    ActiveWindowTracker *m_windowTracker = nullptr;
     quint32 m_activeWindowId = 0;
     MenuEndpoint m_endpoint;
 };
