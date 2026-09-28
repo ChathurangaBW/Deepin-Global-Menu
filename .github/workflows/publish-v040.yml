@@ -1,0 +1,87 @@
+name: Publish v0.4.0
+
+on:
+  push:
+    branches:
+      - agent/publish-v0.4.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+        with:
+          ref: 8a8c024a348df9929478988049dec0c057aec5f1
+          fetch-depth: 0
+
+      - name: Verify release target
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "8a8c024a348df9929478988049dec0c057aec5f1"
+
+      - name: Build source release asset
+        run: |
+          set -euo pipefail
+          git archive \
+            --format=tar.gz \
+            --prefix=deepin-global-menu-0.4.0/ \
+            --output=deepin-global-menu-0.4.0.tar.gz \
+            HEAD
+          sha256sum deepin-global-menu-0.4.0.tar.gz > SHA256SUMS
+
+      - name: Write release notes
+        run: |
+          cat > RELEASE_NOTES.md <<'EOF'
+          # Deepin Global Menu v0.4.0
+
+          First release-candidate implementation with the complete multi-source global-menu stack for modern Deepin/DDE.
+
+          ## Highlights
+
+          - Canonical `com.canonical.AppMenu.Registrar` support, including `GetMenus()` enumeration and stale-client cleanup.
+          - Recursive `com.canonical.dbusmenu` import with live updates, submenu preparation, enabled/visible state, toggles, and action activation.
+          - GTK `org.gtk.Menus` and `org.gtk.Actions` import, including recursive group discovery and live exporter refresh.
+          - Active-window tracking for X11/XWayland through EWMH/XCB.
+          - Native Treeland active-application tracking through the DDE Shell task-manager model.
+          - Verified source priority: DBusMenu → GTK → safe fallback.
+          - DDE-native application/window fallback actions.
+          - Common File/Edit/View/Help fallback actions through XTest on X11 and `zwp_virtual_keyboard_manager_v1` on Treeland when available.
+          - Recursive interactive QML menu rendering.
+          - `dgm-inspect` diagnostics.
+          - Full Deepin 25 plugin build/test coverage in CI.
+
+          ## Validation
+
+          The release commit `8a8c024a348df9929478988049dec0c057aec5f1` passed:
+          - Ubuntu core build, unit tests, D-Bus integration tests, and inspector smoke test.
+          - Full DDE Shell plugin configure/build/test inside `linuxdeepin/deepin:25`.
+          - A fresh smoke-test rerun after merge.
+
+          ## Runtime validation note
+
+          Headless CI cannot physically validate popup placement, focus restoration after menu activation, production compositor input policy, multi-monitor behavior, or every third-party application. Those remain graphical Deepin-session validation items, not known code/CI blockers.
+
+          ## Assets
+
+          - `deepin-global-menu-0.4.0.tar.gz`
+          - `SHA256SUMS`
+          - GitHub-generated source archives for tag `v0.4.0`
+          EOF
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v0.4.0 \
+            --repo "${{ github.repository }}" \
+            --target "8a8c024a348df9929478988049dec0c057aec5f1" \
+            --title "Deepin Global Menu v0.4.0" \
+            --notes-file RELEASE_NOTES.md \
+            deepin-global-menu-0.4.0.tar.gz \
+            SHA256SUMS
