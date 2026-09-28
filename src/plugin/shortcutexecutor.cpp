@@ -225,8 +225,18 @@ bool ShortcutExecutor::available() const
         if (!display) {
             return false;
         }
+
+        int eventBase = 0;
+        int errorBase = 0;
+        int majorVersion = 0;
+        int minorVersion = 0;
+        const bool supported = XTestQueryExtension(display,
+                                                    &eventBase,
+                                                    &errorBase,
+                                                    &majorVersion,
+                                                    &minorVersion);
         XCloseDisplay(display);
-        return true;
+        return supported;
     }
 #endif
 
@@ -272,6 +282,19 @@ bool ShortcutExecutor::sendX11(const QString &shortcut)
         return false;
     }
 
+    int eventBase = 0;
+    int errorBase = 0;
+    int majorVersion = 0;
+    int minorVersion = 0;
+    if (!XTestQueryExtension(display,
+                             &eventBase,
+                             &errorBase,
+                             &majorVersion,
+                             &minorVersion)) {
+        XCloseDisplay(display);
+        return false;
+    }
+
     auto keycodeFor = [display](KeySym symbol) -> KeyCode {
         return symbol == NoSymbol ? 0 : XKeysymToKeycode(display, symbol);
     };
@@ -291,25 +314,32 @@ bool ShortcutExecutor::sendX11(const QString &shortcut)
         return false;
     }
 
+    bool success = true;
     const KeyCode modifiers[] = {control, alt, shift, meta};
     for (const KeyCode modifier : modifiers) {
         if (modifier != 0) {
-            XTestFakeKeyEvent(display, modifier, True, CurrentTime);
+            success = XTestFakeKeyEvent(display,
+                                        modifier,
+                                        True,
+                                        CurrentTime) && success;
         }
     }
 
-    XTestFakeKeyEvent(display, key, True, CurrentTime);
-    XTestFakeKeyEvent(display, key, False, CurrentTime);
+    success = XTestFakeKeyEvent(display, key, True, CurrentTime) && success;
+    success = XTestFakeKeyEvent(display, key, False, CurrentTime) && success;
 
     for (auto it = std::rbegin(modifiers); it != std::rend(modifiers); ++it) {
         if (*it != 0) {
-            XTestFakeKeyEvent(display, *it, False, CurrentTime);
+            success = XTestFakeKeyEvent(display,
+                                        *it,
+                                        False,
+                                        CurrentTime) && success;
         }
     }
 
     XFlush(display);
     XCloseDisplay(display);
-    return true;
+    return success;
 #else
     Q_UNUSED(shortcut);
     return false;
