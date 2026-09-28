@@ -66,10 +66,9 @@ GlobalMenuController::GlobalMenuController(MenuRegistry *registry, QObject *pare
             });
     connect(m_gtkImporter, &GtkMenuImporter::refreshFinished,
             this, [this](bool success) {
-                if (m_source != Source::Gtk) {
-                    return;
-                }
-                if (!success) {
+                if (success && !m_endpoint.isValid()) {
+                    selectSource(Source::Gtk);
+                } else if (!success && m_source == Source::Gtk) {
                     selectFallback();
                 }
                 emit menuStatusChanged();
@@ -335,11 +334,9 @@ void GlobalMenuController::refreshSource()
         m_importer->setEndpoint({});
         const auto gtkContext = gtkContextForActiveWindow();
         m_gtkImporter->setContext(gtkContext);
+        selectFallback();
         if (m_gtkImporter->context().isValid()) {
-            selectSource(Source::Gtk);
             m_gtkImporter->refresh();
-        } else {
-            selectFallback();
         }
     }
 
@@ -391,7 +388,7 @@ void GlobalMenuController::tryGtkFallback()
         return;
     }
 
-    selectSource(Source::Gtk);
+    selectFallback();
     m_gtkImporter->refresh();
 }
 
