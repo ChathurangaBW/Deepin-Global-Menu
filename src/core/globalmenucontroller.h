@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "activewindowtracker.h"
+#include "gtkmenutypes.h"
 #include "menuregistry.h"
 
 #include <QObject>
@@ -10,13 +12,16 @@
 
 namespace dgm {
 
-class ActiveWindowTracker;
 class DbusMenuImporter;
+class GtkMenuImporter;
+struct GtkMenuContext;
 
 class GlobalMenuController final : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(quint32 activeWindowId READ activeWindowId WRITE setActiveWindowId NOTIFY activeWindowIdChanged)
+    Q_PROPERTY(QString activeApplicationId READ activeApplicationId NOTIFY activeWindowIdChanged)
+    Q_PROPERTY(QString menuSource READ menuSource NOTIFY menuSourceChanged)
     Q_PROPERTY(bool hasMenu READ hasMenu NOTIFY menuEndpointChanged)
     Q_PROPERTY(QString menuService READ menuService NOTIFY menuEndpointChanged)
     Q_PROPERTY(QString menuObjectPath READ menuObjectPath NOTIFY menuEndpointChanged)
@@ -29,9 +34,11 @@ public:
     explicit GlobalMenuController(MenuRegistry *registry, QObject *parent = nullptr);
 
     [[nodiscard]] quint32 activeWindowId() const;
+    [[nodiscard]] QString activeApplicationId() const;
     void setActiveWindowId(quint32 windowId);
     void setActiveWindowTracker(ActiveWindowTracker *tracker);
 
+    [[nodiscard]] QString menuSource() const;
     [[nodiscard]] bool hasMenu() const;
     [[nodiscard]] QString menuService() const;
     [[nodiscard]] QString menuObjectPath() const;
@@ -47,18 +54,31 @@ public:
 
 signals:
     void activeWindowIdChanged();
+    void menuSourceChanged();
     void menuEndpointChanged();
     void menuItemsChanged();
     void menuStatusChanged();
 
 private:
-    void refreshEndpoint();
+    enum class Source {
+        None,
+        DbusMenu,
+        Gtk
+    };
+
+    void setActiveWindowInfo(const ActiveWindowInfo &info);
+    void refreshSource();
+    void selectSource(Source source);
+    GtkMenuContext gtkContextForActiveWindow() const;
+    void tryGtkFallback();
 
     MenuRegistry *m_registry = nullptr;
     DbusMenuImporter *m_importer = nullptr;
+    GtkMenuImporter *m_gtkImporter = nullptr;
     ActiveWindowTracker *m_windowTracker = nullptr;
-    quint32 m_activeWindowId = 0;
+    ActiveWindowInfo m_activeWindowInfo;
     MenuEndpoint m_endpoint;
+    Source m_source = Source::None;
 };
 
 } // namespace dgm

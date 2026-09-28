@@ -24,7 +24,7 @@ public:
 
     void stop() override
     {
-        setActiveWindowId(0);
+        setActiveWindowInfo({});
     }
 
     [[nodiscard]] bool isRunning() const override
@@ -38,21 +38,43 @@ public:
 ActiveWindowTracker::ActiveWindowTracker(QObject *parent)
     : QObject(parent)
 {
+    qRegisterMetaType<ActiveWindowInfo>();
 }
 
 quint32 ActiveWindowTracker::activeWindowId() const
 {
-    return m_activeWindowId;
+    return m_activeWindowInfo.x11Id != 0
+        ? m_activeWindowInfo.x11Id
+        : m_activeWindowInfo.nativeId;
+}
+
+const ActiveWindowInfo &ActiveWindowTracker::activeWindowInfo() const
+{
+    return m_activeWindowInfo;
 }
 
 void ActiveWindowTracker::setActiveWindowId(quint32 windowId)
 {
-    if (m_activeWindowId == windowId) {
+    ActiveWindowInfo info = m_activeWindowInfo;
+    info.nativeId = windowId;
+    info.x11Id = windowId;
+    setActiveWindowInfo(info);
+}
+
+void ActiveWindowTracker::setActiveWindowInfo(const ActiveWindowInfo &info)
+{
+    if (m_activeWindowInfo == info) {
         return;
     }
 
-    m_activeWindowId = windowId;
-    emit activeWindowIdChanged(windowId);
+    const quint32 previousId = activeWindowId();
+    m_activeWindowInfo = info;
+    const quint32 nextId = activeWindowId();
+
+    if (previousId != nextId) {
+        emit activeWindowIdChanged(nextId);
+    }
+    emit activeWindowInfoChanged(m_activeWindowInfo);
 }
 
 ActiveWindowTracker *createActiveWindowTracker(QObject *parent)

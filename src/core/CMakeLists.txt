@@ -9,6 +9,10 @@ add_library(dgm-core STATIC
     dbusmenutypes.h
     dbusmenuimporter.cpp
     dbusmenuimporter.h
+    gtkmenutypes.cpp
+    gtkmenutypes.h
+    gtkmenuimporter.cpp
+    gtkmenuimporter.h
     activewindowtracker.cpp
     activewindowtracker.h
     globalmenucontroller.cpp

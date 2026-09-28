@@ -74,7 +74,9 @@ AppletItem {
                   : (Applet.hasMenu
                      ? ("Window 0x"
                         + Applet.activeWindowId.toString(16)
-                        + " · DBusMenu revision "
+                        + " · "
+                        + Applet.menuSource
+                        + " revision "
                         + Applet.menuRevision)
                      : "Waiting for the active application's exported menu")
 

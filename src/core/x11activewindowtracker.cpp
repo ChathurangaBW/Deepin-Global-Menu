@@ -2,6 +2,7 @@
 
 #include "x11activewindowtracker.h"
 
+#include <QByteArray>
 #include <QSocketNotifier>
 
 #include <cstdlib>
@@ -51,15 +52,20 @@ bool X11ActiveWindowTracker::start()
     }
     m_rootWindow = screen->root;
 
-    constexpr char atomName[] = "_NET_ACTIVE_WINDOW";
-    const auto atomCookie = xcb_intern_atom(m_connection, false, sizeof(atomName) - 1, atomName);
-    auto *atomReply = xcb_intern_atom_reply(m_connection, atomCookie, nullptr);
-    if (!atomReply) {
+    m_activeWindowAtom = internAtom("_NET_ACTIVE_WINDOW");
+    m_netWmPidAtom = internAtom("_NET_WM_PID");
+    m_netWmNameAtom = internAtom("_NET_WM_NAME");
+    m_gtkApplicationIdAtom = internAtom("_GTK_APPLICATION_ID");
+    m_gtkUniqueBusNameAtom = internAtom("_GTK_UNIQUE_BUS_NAME");
+    m_gtkApplicationObjectPathAtom = internAtom("_GTK_APPLICATION_OBJECT_PATH");
+    m_gtkWindowObjectPathAtom = internAtom("_GTK_WINDOW_OBJECT_PATH");
+    m_gtkAppMenuObjectPathAtom = internAtom("_GTK_APP_MENU_OBJECT_PATH");
+    m_gtkMenubarObjectPathAtom = internAtom("_GTK_MENUBAR_OBJECT_PATH");
+
+    if (m_activeWindowAtom == XCB_ATOM_NONE) {
         stop();
         return false;
     }
-    m_activeWindowAtom = atomReply->atom;
-    std::free(atomReply);
 
     const uint32_t eventMask = XCB_EVENT_MASK_PROPERTY_CHANGE;
     const auto attributesCookie = xcb_change_window_attributes_checked(
@@ -98,8 +104,16 @@ void X11ActiveWindowTracker::stop()
 
     m_rootWindow = XCB_WINDOW_NONE;
     m_activeWindowAtom = XCB_ATOM_NONE;
+    m_netWmPidAtom = XCB_ATOM_NONE;
+    m_netWmNameAtom = XCB_ATOM_NONE;
+    m_gtkApplicationIdAtom = XCB_ATOM_NONE;
+    m_gtkUniqueBusNameAtom = XCB_ATOM_NONE;
+    m_gtkApplicationObjectPathAtom = XCB_ATOM_NONE;
+    m_gtkWindowObjectPathAtom = XCB_ATOM_NONE;
+    m_gtkAppMenuObjectPathAtom = XCB_ATOM_NONE;
+    m_gtkMenubarObjectPathAtom = XCB_ATOM_NONE;
     m_running = false;
-    setActiveWindowId(0);
+    setActiveWindowInfo({});
 }
 
 bool X11ActiveWindowTracker::isRunning() const
@@ -134,7 +148,7 @@ void X11ActiveWindowTracker::refreshActiveWindow()
 {
     if (!m_connection || m_rootWindow == XCB_WINDOW_NONE
         || m_activeWindowAtom == XCB_ATOM_NONE) {
-        setActiveWindowId(0);
+        setActiveWindowInfo({});
         return;
     }
 
@@ -148,25 +162,127 @@ void X11ActiveWindowTracker::refreshActiveWindow()
 
     xcb_generic_error_t *error = nullptr;
     auto *reply = xcb_get_property_reply(m_connection, cookie, &error);
-    if (error) {
-        std::free(error);
-    }
+    const bool hadError = error != nullptr;
+    std::free(error);
 
-    if (!reply) {
-        setActiveWindowId(0);
+    if (!reply || hadError) {
+        std::free(reply);
+        setActiveWindowInfo({});
         return;
     }
 
-    quint32 activeWindow = 0;
-    if (!error
-        && reply->type == XCB_ATOM_WINDOW
+    xcb_window_t activeWindow = XCB_WINDOW_NONE;
+    if (reply->type == XCB_ATOM_WINDOW
         && reply->format == 32
         && xcb_get_property_value_length(reply) >= static_cast<int>(sizeof(xcb_window_t))) {
         activeWindow = *static_cast<xcb_window_t *>(xcb_get_property_value(reply));
     }
+    std::free(reply);
+
+    if (activeWindow == XCB_WINDOW_NONE) {
+        setActiveWindowInfo({});
+        return;
+    }
+
+    ActiveWindowInfo info;
+    info.nativeId = activeWindow;
+    info.x11Id = activeWindow;
+    info.pid = readCardinalProperty(activeWindow, m_netWmPidAtom);
+    info.appId = readStringProperty(activeWindow, m_gtkApplicationIdAtom);
+    info.title = readStringProperty(activeWindow, m_netWmNameAtom);
+    if (info.title.isEmpty()) {
+        info.title = readStringProperty(activeWindow, XCB_ATOM_WM_NAME);
+    }
+    info.backend = QStringLiteral("x11");
+
+    info.gtkUniqueBusName = readStringProperty(activeWindow, m_gtkUniqueBusNameAtom);
+    info.gtkApplicationObjectPath =
+        readStringProperty(activeWindow, m_gtkApplicationObjectPathAtom);
+    info.gtkWindowObjectPath =
+        readStringProperty(activeWindow, m_gtkWindowObjectPathAtom);
+    info.gtkAppMenuObjectPath =
+        readStringProperty(activeWindow, m_gtkAppMenuObjectPathAtom);
+    info.gtkMenubarObjectPath =
+        readStringProperty(activeWindow, m_gtkMenubarObjectPathAtom);
+
+    setActiveWindowInfo(info);
+}
+
+xcb_atom_t X11ActiveWindowTracker::internAtom(const char *name) const
+{
+    if (!m_connection || !name) {
+        return XCB_ATOM_NONE;
+    }
+
+    const QByteArray bytes(name);
+    const auto cookie = xcb_intern_atom(m_connection, false, bytes.size(), bytes.constData());
+    auto *reply = xcb_intern_atom_reply(m_connection, cookie, nullptr);
+    if (!reply) {
+        return XCB_ATOM_NONE;
+    }
+
+    const xcb_atom_t atom = reply->atom;
+    std::free(reply);
+    return atom;
+}
+
+QString X11ActiveWindowTracker::readStringProperty(xcb_window_t window, xcb_atom_t atom) const
+{
+    if (!m_connection || window == XCB_WINDOW_NONE || atom == XCB_ATOM_NONE) {
+        return {};
+    }
+
+    const auto cookie = xcb_get_property(m_connection,
+                                         false,
+                                         window,
+                                         atom,
+                                         XCB_GET_PROPERTY_TYPE_ANY,
+                                         0,
+                                         4096);
+    xcb_generic_error_t *error = nullptr;
+    auto *reply = xcb_get_property_reply(m_connection, cookie, &error);
+    const bool hadError = error != nullptr;
+    std::free(error);
+
+    if (!reply || hadError || reply->format != 8) {
+        std::free(reply);
+        return {};
+    }
+
+    const int length = xcb_get_property_value_length(reply);
+    const auto *data = static_cast<const char *>(xcb_get_property_value(reply));
+    const QString value = length > 0 ? QString::fromUtf8(data, length) : QString{};
+    std::free(reply);
+    return value;
+}
+
+quint32 X11ActiveWindowTracker::readCardinalProperty(xcb_window_t window, xcb_atom_t atom) const
+{
+    if (!m_connection || window == XCB_WINDOW_NONE || atom == XCB_ATOM_NONE) {
+        return 0;
+    }
+
+    const auto cookie = xcb_get_property(m_connection,
+                                         false,
+                                         window,
+                                         atom,
+                                         XCB_ATOM_CARDINAL,
+                                         0,
+                                         1);
+    xcb_generic_error_t *error = nullptr;
+    auto *reply = xcb_get_property_reply(m_connection, cookie, &error);
+    const bool hadError = error != nullptr;
+    std::free(error);
+
+    quint32 value = 0;
+    if (reply && !hadError
+        && reply->format == 32
+        && xcb_get_property_value_length(reply) >= static_cast<int>(sizeof(quint32))) {
+        value = *static_cast<quint32 *>(xcb_get_property_value(reply));
+    }
 
     std::free(reply);
-    setActiveWindowId(activeWindow);
+    return value;
 }
 
 } // namespace dgm
