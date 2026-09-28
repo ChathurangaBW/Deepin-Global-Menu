@@ -6,12 +6,7 @@
 set(CPACK_PACKAGE_NAME "deepin-global-menu")
 set(CPACK_PACKAGE_VENDOR "Deepin Global Menu")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_PACKAGE_DESCRIPTION
-    "Native global application menu for modern Deepin/DDE. "
-    "Provides a DDE Shell global-menu applet, DBusMenu and GTK menu importers, "
-    "X11/XWayland and Treeland active-application tracking, fallback actions, "
-    "and the dgm-inspect diagnostic utility."
-)
+set(CPACK_PACKAGE_DESCRIPTION "Native global application menu for modern Deepin/DDE. Provides a DDE Shell global-menu applet, DBusMenu and GTK menu importers, X11/XWayland and Treeland active-application tracking, fallback actions, and the dgm-inspect diagnostic utility.")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/ChathurangaBW/Deepin-Global-Menu")
 set(CPACK_PACKAGE_CONTACT "ChathurangaBW")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
@@ -36,6 +31,7 @@ set(CPACK_RPM_PACKAGE_NAME "deepin-global-menu")
 set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "User Interface/Desktops")
 set(CPACK_RPM_PACKAGE_URL "${CPACK_PACKAGE_HOMEPAGE_URL}")
+set(CPACK_RPM_PACKAGE_DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION}")
 set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
 set(CPACK_RPM_PACKAGE_RELOCATABLE OFF)
 
