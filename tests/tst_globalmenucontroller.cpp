@@ -2,6 +2,7 @@
 
 #include "activewindowtracker.h"
 #include "globalmenucontroller.h"
+#include "gtkmenutypes.h"
 #include "menuregistry.h"
 
 #include <QDBusObjectPath>
@@ -46,6 +47,33 @@ private:
     bool m_running = false;
 };
 
+class FakeGtkMenuService final : public QObject
+{
+    Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.gtk.Menus")
+
+public slots:
+    void Start(const QList<uint> &groups, dgm::GtkMenuSectionList &content) const
+    {
+        Q_UNUSED(groups);
+
+        QVariantMap file;
+        file.insert(QStringLiteral("label"), QStringLiteral("_File"));
+        file.insert(QStringLiteral("action"), QStringLiteral("app.quit"));
+
+        dgm::GtkMenuSection root;
+        root.groupId = 0;
+        root.menuId = 0;
+        root.items = {file};
+        content = {root};
+    }
+
+    void End(const QList<uint> &groups)
+    {
+        Q_UNUSED(groups);
+    }
+};
+
 class GlobalMenuControllerTest final : public QObject
 {
     Q_OBJECT
@@ -54,6 +82,7 @@ private slots:
     void followsTrackerAndRegistry();
     void providesSafeFallbackMenu();
     void exposesShortcutFallbackWhenAvailable();
+    void fallsBackFromDeadDbusMenuToGtk();
 };
 
 void GlobalMenuControllerTest::followsTrackerAndRegistry()
@@ -182,6 +211,55 @@ void GlobalMenuControllerTest::exposesShortcutFallbackWhenAvailable()
     QCOMPARE(shortcutSpy.count(), 1);
     QCOMPARE(shortcutSpy.takeFirst().constFirst().toString(),
              QStringLiteral("Ctrl+C"));
+}
+
+void GlobalMenuControllerTest::fallsBackFromDeadDbusMenuToGtk()
+{
+    constexpr auto gtkService = "org.deepin.GlobalMenu.ControllerGtk";
+    constexpr auto menuPath =
+        "/org/deepin/GlobalMenu/ControllerGtk/menus/MenuBar";
+
+    dgm::registerGtkMenuMetaTypes();
+    auto bus = QDBusConnection::sessionBus();
+    QVERIFY(bus.isConnected());
+
+    FakeGtkMenuService gtkMenus;
+    QVERIFY(bus.registerService(QString::fromLatin1(gtkService)));
+    QVERIFY(bus.registerObject(QString::fromLatin1(menuPath),
+                               &gtkMenus,
+                               QDBusConnection::ExportAllSlots));
+
+    dgm::MenuRegistry registry;
+    registry.registerWindow(
+        99,
+        QStringLiteral("org.deepin.GlobalMenu.MissingDbusExporter"),
+        QDBusObjectPath(QStringLiteral("/MissingMenu")));
+
+    dgm::GlobalMenuController controller(&registry);
+    FakeActiveWindowTracker tracker;
+    controller.setActiveWindowTracker(&tracker);
+
+    dgm::ActiveWindowInfo info;
+    info.nativeId = 99;
+    info.x11Id = 99;
+    info.appId = QString::fromLatin1(gtkService);
+    info.appName = QStringLiteral("Controller GTK");
+    info.backend = QStringLiteral("x11");
+    tracker.activateInfo(info);
+
+    QTRY_COMPARE_WITH_TIMEOUT(controller.menuSource(),
+                              QStringLiteral("gtk"),
+                              5000);
+    QVERIFY(controller.menuReady());
+    QCOMPARE(controller.menuService(), QString::fromLatin1(gtkService));
+
+    const auto top = controller.menuItems();
+    QCOMPARE(top.size(), 1);
+    QCOMPARE(top.constFirst().toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("File"));
+
+    bus.unregisterObject(QString::fromLatin1(menuPath));
+    bus.unregisterService(QString::fromLatin1(gtkService));
 }
 
 QTEST_GUILESS_MAIN(GlobalMenuControllerTest)

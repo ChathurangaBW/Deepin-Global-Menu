@@ -66,7 +66,11 @@ GlobalMenuController::GlobalMenuController(MenuRegistry *registry, QObject *pare
             });
     connect(m_gtkImporter, &GtkMenuImporter::refreshFinished,
             this, [this](bool success) {
-                if (success && !m_endpoint.isValid()) {
+                // A failed DBusMenu endpoint may still remain registered. Once
+                // the controller has left the DBusMenu source, a verified GTK
+                // export is allowed to replace the safe fallback even if that
+                // stale registrar endpoint still exists.
+                if (success && m_source != Source::DbusMenu) {
                     selectSource(Source::Gtk);
                 } else if (!success && m_source == Source::Gtk) {
                     selectFallback();

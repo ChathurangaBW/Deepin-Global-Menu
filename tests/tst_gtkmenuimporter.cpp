@@ -45,6 +45,27 @@ public:
 
     dgm::GtkMenuSectionList sections;
 
+    void appendPreferences()
+    {
+        QVariantMap preferences;
+        preferences.insert(QStringLiteral("label"), QStringLiteral("_Preferences"));
+        preferences.insert(QStringLiteral("action"), QStringLiteral("app.preferences"));
+
+        for (auto &section : sections) {
+            if (section.groupId == 0 && section.menuId == 1) {
+                section.items.append(preferences);
+                break;
+            }
+        }
+
+        dgm::GtkMenuChange change;
+        change.groupId = 0;
+        change.menuId = 1;
+        change.position = 2;
+        change.added = {preferences};
+        emit Changed({change});
+    }
+
 public slots:
     void Start(const QList<uint> &groups, dgm::GtkMenuSectionList &content) const
     {
@@ -56,6 +77,9 @@ public slots:
     {
         Q_UNUSED(groups);
     }
+
+signals:
+    void Changed(const dgm::GtkMenuChangeList &changes);
 };
 
 class FakeGtkActions final : public QObject
@@ -121,6 +145,7 @@ private slots:
     void initTestCase();
     void cleanupTestCase();
     void importsGtkMenuAndActivatesActions();
+    void refreshesWhenGtkMenuChanges();
     void fallsBackToActionGroups();
 
 private:
@@ -141,7 +166,8 @@ void GtkMenuImporterTest::initTestCase()
     QVERIFY(bus.registerService(QString::fromLatin1(kService)));
     QVERIFY(bus.registerObject(QString::fromLatin1(kMenuPath),
                                &m_menus,
-                               QDBusConnection::ExportAllSlots));
+                               QDBusConnection::ExportAllSlots
+                                   | QDBusConnection::ExportAllSignals));
     QVERIFY(bus.registerObject(QString::fromLatin1(kActionsPath),
                                &m_actions,
                                QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals));
@@ -201,6 +227,36 @@ void GtkMenuImporterTest::importsGtkMenuAndActivatesActions()
     importer.triggerAction(quit.value(QStringLiteral("id")).toInt());
     QTRY_COMPARE_WITH_TIMEOUT(actionSpy.count(), 1, 3000);
     QCOMPARE(m_actions.lastAction, QStringLiteral("quit"));
+}
+
+void GtkMenuImporterTest::refreshesWhenGtkMenuChanges()
+{
+    dgm::GtkMenuImporter importer;
+
+    dgm::GtkMenuContext context;
+    context.busName = QString::fromLatin1(kService);
+    context.applicationName = QStringLiteral("Test GTK");
+    context.appActionPath = QString::fromLatin1(kActionsPath);
+    context.menubarPath = QString::fromLatin1(kMenuPath);
+    importer.setContext(context);
+
+    QSignalSpy refreshSpy(&importer, &dgm::GtkMenuImporter::refreshFinished);
+    importer.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(!refreshSpy.isEmpty(), 3000);
+    QVERIFY(refreshSpy.takeFirst().constFirst().toBool());
+
+    const uint initialRevision = importer.revision();
+    m_menus.appendPreferences();
+
+    QTRY_VERIFY_WITH_TIMEOUT(importer.revision() > initialRevision, 3000);
+
+    const auto top = importer.topLevelItems();
+    QCOMPARE(top.size(), 1);
+    const auto children =
+        top.constFirst().toMap().value(QStringLiteral("children")).toList();
+    QCOMPARE(children.size(), 3);
+    QCOMPARE(children.constLast().toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("Preferences"));
 }
 
 void GtkMenuImporterTest::fallsBackToActionGroups()

@@ -2,115 +2,91 @@
 
 ## Target
 
-Build a native macOS-style global application menu for modern Deepin/DDE without replacing the Deepin shell or dock.
+Deliver a native macOS-style global application menu for modern Deepin/DDE without replacing the Deepin shell or dock.
 
-The implementation is split into protocol, window tracking, menu import, and presentation layers so X11 and Treeland/Wayland can evolve independently.
+## v0.4.0 implementation status
 
-## Architecture
+### Registrar and protocol core
 
-```text
-Application menu exporter
-        |
-        | com.canonical.AppMenu.Registrar
-        v
-+-----------------------+
-| AppMenuRegistrar      |
-+-----------------------+
-        |
-        v
-+-----------------------+
-| MenuRegistry          |
-+-----------------------+
-        ^
-        |
-Active window tracker
-(X11 / Treeland)
-        |
-        v
-+-----------------------+
-| GlobalMenuController  |
-+-----------------------+
-        |
-        v
-+-----------------------+
-| DBusMenu importer     |
-+-----------------------+
-        |
-        v
-DDE Shell applet / panel UI
-```
+- [x] Out-of-tree CMake project.
+- [x] DDE Shell plugin integration through `Dde::Shell`.
+- [x] `com.canonical.AppMenu.Registrar` implementation.
+- [x] Window-to-menu endpoint registry with stale D-Bus client cleanup.
+- [x] Recursive `com.canonical.dbusmenu` import.
+- [x] `LayoutUpdated` and `ItemsPropertiesUpdated` handling.
+- [x] `Event(clicked)` activation.
+- [x] `AboutToShow` submenu preparation.
+- [x] Recursive QML menu UI with separators, enabled/disabled entries, and toggle state.
+- [x] `dgm-inspect` diagnostics.
 
-## Milestone 1 — Registrar foundation
+### GTK application menus
 
-- [x] Bootstrap out-of-tree CMake project.
-- [x] Link against the installed `DDEShell` package / `Dde::Shell` target.
-- [x] Implement window-to-menu endpoint registry.
-- [x] Implement initial `com.canonical.AppMenu.Registrar` session-bus service.
-- [x] Remove stale window registrations when a DBus client disappears.
-- [x] Add shell-facing controller properties.
-- [x] Add a minimal DDE Shell applet.
-- [x] Add registry unit tests.
-- [ ] Validate build on Deepin 25 with the packaged DDE Shell development files.
-- [ ] Validate registrar introspection against GTK/Qt exporters.
-
-## Milestone 2 — DBusMenu importer and UI
-
-- [x] Implement `com.canonical.dbusmenu` client support.
-- [x] Fetch the root layout with `GetLayout` and recursively model menu nodes.
-- [x] Handle `LayoutUpdated` by refreshing the exported tree.
-- [x] Handle `ItemsPropertiesUpdated` in-place, with a full refresh fallback for unknown nodes.
-- [x] Send `Event(clicked)` actions.
-- [x] Send `AboutToShow` and refresh when the exporter reports a change.
-- [x] Expose a recursive QVariant tree suitable for QML.
-- [x] Add `dgm-inspect` for direct service/path or registrar-window inspection.
-- [x] Add DBusMenu data-model tests.
-- [x] Implement interactive top-level menus and recursive submenus in QML.
-- [x] Render separators, disabled items, and check/radio toggle state.
-- [ ] Validate the wire decoder and interactive menu behavior against real GTK/Qt exporters on Deepin.
-- [ ] Replace/augment the QVariant tree with a dedicated QAbstractItemModel if profiling or final UI behavior requires it.
-
-## Milestone 3 — Active window tracking
+- [x] `org.gtk.Menus` import.
+- [x] `org.gtk.Actions` activation.
+- [x] Action enabled/toggle state on Qt 6.8+.
+- [x] Live GTK menu/action refresh handling.
+- [x] Safe compatibility behavior for pre-Qt-6.8 empty-signature handling.
 
 ### X11 / XWayland
 
-- [x] Add an `ActiveWindowTracker` abstraction.
-- [x] Implement EWMH/XCB `_NET_ACTIVE_WINDOW` tracking.
-- [x] Map the active X11 window ID directly to registrar registrations.
-- [x] Add protocol-independent tests around tracker/controller handoff.
-- [ ] Validate focus changes, transient windows, and XWayland behavior on Deepin 25.
+- [x] `ActiveWindowTracker` abstraction.
+- [x] EWMH/XCB `_NET_ACTIVE_WINDOW` tracker.
+- [x] GTK X11 metadata discovery.
+- [x] `WM_CLASS` application identity fallback.
+- [x] Direct active-window to AppMenu registrar mapping.
+- [x] XTest shortcut fallback when available.
 
 ### Treeland / Wayland
 
-- [ ] Identify the supported DDE/Treeland active-toplevel interface.
-- [ ] Avoid depending on X11 window IDs in the Wayland-native path.
-- [ ] Implement a Treeland tracker behind the same abstraction.
-- [ ] Map Wayland-native application/toplevel identity to exported global-menu endpoints.
+- [x] Identify the supported DDE/Treeland active-application source.
+- [x] Track active applications through `org.deepin.ds.dock.taskmanager`.
+- [x] Avoid X11 IDs in the native Wayland menu-selection path.
+- [x] Use application identity to probe GTK exports.
+- [x] Use DDE task-manager methods for safe application/window fallback actions.
+- [x] Generate a `zwp_virtual_keyboard_manager_v1` client for shortcut fallback.
+- [x] Gate shortcut menus on actual backend availability.
 
-Treeland protocol extensions are still experimental upstream, so this backend should be isolated behind the tracker abstraction rather than leaking compositor-specific details into the controller.
+### CI and target build
 
-## Milestone 4 — Native top panel
+- [x] Core warning-enabled build.
+- [x] Unit and D-Bus integration test suite.
+- [x] GTK importer tests.
+- [x] Controller/fallback tests.
+- [x] Full DDE Shell plugin configure/build/test in `linuxdeepin/deepin:25`.
+- [x] Qt Wayland protocol generation exercised in target CI.
 
-- [ ] Decide between an applet embedded in an existing DDE panel and a dedicated `DPanel` plugin after real-system validation.
-- [ ] Left side: launcher/application identity + global menu.
-- [ ] Right side: preserve/compose Deepin system indicators rather than reimplementing them where possible.
-- [ ] Support multi-monitor placement and configurable panel height.
-- [ ] Add overflow behavior for applications with very wide menu bars.
+## Source priority
 
-## Milestone 5 — Compatibility and polish
+```text
+DBusMenu export
+      |
+      | if unavailable or broken
+      v
+GTK org.gtk.Menus / org.gtk.Actions
+      |
+      | if unavailable
+      v
+DDE application/window fallback
+      |
+      +-- optional shortcut actions when XTest or Treeland virtual keyboard exists
+```
 
-Test separately:
+A source is not promoted merely because its address can be guessed. The controller keeps the safe fallback visible until an exporter has successfully answered.
 
-- Deepin/DTK applications
-- Qt 5 / Qt 6
-- GTK 2 / GTK 3
-- GTK 4/libadwaita
-- LibreOffice
-- Firefox
-- Chromium
-- Electron applications
+## Remaining runtime validation
 
-Then add visual integration: theme colors, blur/transparency, spacing, keyboard navigation, accessibility, localization, and packaging.
+These items require a real graphical Deepin 25 session and are not reproducible in headless CI:
 
-## Immediate next engineering task
+- [ ] Load/unload the applet in a stock DDE Shell session.
+- [ ] Verify popup placement and keyboard navigation under the shipping DDE style.
+- [ ] Verify focus returns to the target app before delayed shortcut injection.
+- [ ] Verify Treeland virtual-keyboard delivery with the production compositor policy.
+- [ ] Verify X11/XWayland focus switching, transient windows, and multi-window applications.
+- [ ] Exercise real Qt/DTK, GTK, LibreOffice, Firefox, Chromium, and Electron applications.
+- [ ] Exercise multi-monitor placement and very wide menu bars.
 
-Run the X11 prototype on a clean Deepin 25 system and validate automatic focus-to-menu switching against real Qt and GTK exporters. Fix protocol/runtime differences found there before starting the Treeland-native tracker. After that, decide whether the final shell surface should remain an applet or move to a dedicated panel plugin.
+These are release-validation tasks rather than missing implementation backends.
+
+## Future optional work
+
+The current shell surface is an applet. A dedicated `DPanel` implementation, advanced overflow UI, localization, accessibility refinement, per-application shortcut profiles, and additional visual polish can be developed as later product work without changing the protocol/window-tracking architecture.
