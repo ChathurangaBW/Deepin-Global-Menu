@@ -51,7 +51,7 @@ jobs:
       image: linuxdeepin/deepin:25
 
     steps:
-      - name: Install Deepin 25 development dependencies
+      - name: Install Deepin 25 development and packaging dependencies
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -59,6 +59,7 @@ jobs:
             ca-certificates \
             cmake \
             dbus-daemon \
+            file \
             git \
             libdde-shell-dev \
             libdtk6gui-dev \
@@ -70,7 +71,8 @@ jobs:
             qt6-base-dev \
             qt6-declarative-dev \
             qt6-wayland-dev \
-            qt6-wayland-dev-tools
+            qt6-wayland-dev-tools \
+            rpm
 
       - name: Checkout
         uses: actions/checkout@v5
@@ -82,7 +84,7 @@ jobs:
             -DDGM_BUILD_TOOLS=ON \
             -DDGM_BUILD_TESTS=ON \
             -DDGM_ENABLE_X11_TRACKER=ON \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
 
       - name: Build full plugin
@@ -90,3 +92,49 @@ jobs:
 
       - name: Unit and D-Bus integration tests
         run: dbus-run-session -- ctest --test-dir build-deepin --output-on-failure
+
+      - name: Build DEB package
+        run: |
+          mkdir -p package-out
+          cpack --config build-deepin/CPackConfig.cmake -G DEB -B package-out
+
+      - name: Build RPM package
+        run: cpack --config build-deepin/CPackConfig.cmake -G RPM -B package-out
+
+      - name: Validate package payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find package-out -maxdepth 1 -name '*.deb' -print -quit)"
+          rpm_pkg="$(find package-out -maxdepth 1 -name '*.rpm' -print -quit)"
+          test -n "$deb"
+          test -n "$rpm_pkg"
+
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | tee /tmp/deb-contents.txt
+          grep -q 'dgm-inspect' /tmp/deb-contents.txt
+          grep -q 'org.deepin.ds.globalmenu' /tmp/deb-contents.txt
+
+          rpm -qip "$rpm_pkg"
+          rpm -qlp "$rpm_pkg" | tee /tmp/rpm-contents.txt
+          grep -q 'dgm-inspect' /tmp/rpm-contents.txt
+          grep -q 'org.deepin.ds.globalmenu' /tmp/rpm-contents.txt
+
+      - name: Install DEB and smoke installed CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find package-out -maxdepth 1 -name '*.deb' -print -quit)"
+          apt-get install -y "$(realpath "$deb")"
+          command -v dgm-inspect
+          dgm-inspect --help
+
+      - name: Upload installable packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepin-global-menu-packages
+          path: |
+            package-out/*.deb
+            package-out/*.rpm
+            package-out/*.sha256
+          if-no-files-found: error

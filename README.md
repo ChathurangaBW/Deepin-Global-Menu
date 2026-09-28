@@ -2,7 +2,29 @@
 
 A native global application menu for modern Deepin/DDE, implemented as a DDE Shell applet with X11/XWayland and Treeland-aware backends.
 
-> **Status: v0.4.0 release-candidate implementation.** Core tests and the complete DDE Shell plugin build pass in CI, including an official Deepin 25 container. The remaining validation is graphical runtime testing inside a real Deepin 25 desktop session, because a headless CI container cannot exercise compositor focus, popup placement, or real application keyboard focus.
+> **Status: v0.4.1 packaging release.** Core tests and the complete DDE Shell plugin build pass in CI, including an official Deepin 25 container. The remaining validation is graphical runtime testing inside a real Deepin 25 desktop session, because a headless CI container cannot exercise compositor focus, popup placement, or real application keyboard focus.
+
+## Install
+
+### Deepin 25 / Debian-style systems
+
+Download the `.deb` from the latest GitHub release and install it normally:
+
+```bash
+sudo apt install ./deepin-global-menu_0.4.1_amd64.deb
+```
+
+The package installs the DDE Shell applet and the `dgm-inspect` diagnostic utility. You do not need a compiler or the development packages.
+
+### RPM-style systems
+
+An RPM is also published for compatible DDE environments:
+
+```bash
+sudo dnf install ./deepin-global-menu-0.4.1-1.x86_64.rpm
+```
+
+Deepin itself is Debian-based, so the `.deb` is the primary package. The RPM is an alternate format and still requires compatible DDE Shell and Qt runtime ABIs.
 
 ## What works
 
@@ -19,6 +41,7 @@ A native global application menu for modern Deepin/DDE, implemented as a DDE She
 - Renders clickable top-level buttons, recursive submenus, separators, disabled entries, and check/radio state in QML.
 - Includes `dgm-inspect` for DBusMenu diagnostics.
 - Builds and tests both the portable core and the full DDE Shell plugin in CI.
+- Produces validated `.deb` and `.rpm` packages from the same CMake install tree.
 
 ## Architecture
 
@@ -50,6 +73,8 @@ The controller does not expose an unverified menu source. A fallback is availabl
 
 ## Build prerequisites
 
+End users installing a package do **not** need these. They are only for developers building from source.
+
 Core development needs:
 
 - CMake 3.16+
@@ -73,6 +98,15 @@ On Deepin 25, the CI dependency set in `.github/workflows/core-qa.yml` is the re
 cmake -S . -B build -G Ninja
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
+```
+
+### Build installable packages
+
+After configuring and building the full plugin:
+
+```bash
+cpack --config build/CPackConfig.cmake -G DEB -B package-out
+cpack --config build/CPackConfig.cmake -G RPM -B package-out
 ```
 
 ### Core/tools-only build
@@ -132,7 +166,9 @@ CI currently verifies:
 - registry, DBusMenu, GTK importer, controller, fallback, and D-Bus integration tests;
 - inspector CLI smoke test;
 - a full plugin configure/build/test cycle inside `linuxdeepin/deepin:25`;
-- generated Treeland virtual-keyboard client code and XTest linkage when available.
+- generated Treeland virtual-keyboard client code and XTest linkage when available;
+- `.deb` and `.rpm` package generation and payload validation;
+- installation of the generated `.deb` plus an installed `dgm-inspect --help` smoke test.
 
 A real graphical Deepin 25 session is still needed to validate things a headless container cannot reproduce: shell applet loading, popup geometry, focus restoration after menu activation, real Treeland virtual-keyboard delivery, XWayland focus changes, multiple monitors, and behavior across actual third-party applications.
 
