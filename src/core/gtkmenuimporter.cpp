@@ -211,10 +211,10 @@ GtkMenuContext GtkMenuImporter::normalizedContext(GtkMenuContext context)
 
     // GtkApplication commonly uses these paths. Exact X11 metadata wins.
     if (context.appMenuPath.isEmpty() && !basePath.isEmpty()) {
-        context.appMenuPath = basePath + QStringLiteral("/menus/AppMenu");
+        context.appMenuPath = basePath + QStringLiteral("/menus/appmenu");
     }
     if (context.menubarPath.isEmpty() && !basePath.isEmpty()) {
-        context.menubarPath = basePath + QStringLiteral("/menus/MenuBar");
+        context.menubarPath = basePath + QStringLiteral("/menus/menubar");
     }
 
     return context;

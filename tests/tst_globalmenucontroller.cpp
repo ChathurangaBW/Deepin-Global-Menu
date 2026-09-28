@@ -218,7 +218,7 @@ void GlobalMenuControllerTest::fallsBackFromDeadDbusMenuToGtk()
 {
     constexpr auto gtkService = "org.deepin.GlobalMenu.ControllerGtk";
     constexpr auto menuPath =
-        "/org/deepin/GlobalMenu/ControllerGtk/menus/MenuBar";
+        "/org/deepin/GlobalMenu/ControllerGtk/menus/menubar";
 
     dgm::registerGtkMenuMetaTypes();
     auto bus = QDBusConnection::sessionBus();
