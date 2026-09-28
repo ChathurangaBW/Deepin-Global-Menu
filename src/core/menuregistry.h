@@ -34,6 +34,7 @@ public:
     void unregisterService(const QString &service);
 
     [[nodiscard]] MenuEndpoint menuForWindow(quint32 windowId) const;
+    [[nodiscard]] const QHash<quint32, MenuEndpoint> &entries() const;
     [[nodiscard]] bool contains(quint32 windowId) const;
 
 signals:

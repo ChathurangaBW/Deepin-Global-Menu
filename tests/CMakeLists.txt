@@ -6,6 +6,12 @@ add_executable(tst-menuregistry
 target_link_libraries(tst-menuregistry PRIVATE dgm-core Qt6::Test)
 add_test(NAME menuregistry COMMAND tst-menuregistry)
 
+add_executable(tst-appmenuregistrar
+    tst_appmenuregistrar.cpp
+)
+target_link_libraries(tst-appmenuregistrar PRIVATE dgm-core Qt6::Test)
+add_test(NAME appmenuregistrar COMMAND tst-appmenuregistrar)
+
 add_executable(tst-dbusmenutypes
     tst_dbusmenutypes.cpp
 )
