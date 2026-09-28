@@ -20,7 +20,7 @@ public:
         QVariantMap file;
         file.insert(QStringLiteral("label"), QStringLiteral("_File"));
         file.insert(QStringLiteral(":submenu"),
-                    QVariant::fromValue(dgm::GtkMenuLink{0, 1}));
+                    QVariant::fromValue(dgm::GtkMenuLink{777, 1}));
 
         dgm::GtkMenuSection root;
         root.groupId = 0;
@@ -36,7 +36,7 @@ public:
         toggle.insert(QStringLiteral("action"), QStringLiteral("app.read-only"));
 
         dgm::GtkMenuSection fileMenu;
-        fileMenu.groupId = 0;
+        fileMenu.groupId = 777;
         fileMenu.menuId = 1;
         fileMenu.items = {quit, toggle};
 
@@ -52,14 +52,14 @@ public:
         preferences.insert(QStringLiteral("action"), QStringLiteral("app.preferences"));
 
         for (auto &section : sections) {
-            if (section.groupId == 0 && section.menuId == 1) {
+            if (section.groupId == 777 && section.menuId == 1) {
                 section.items.append(preferences);
                 break;
             }
         }
 
         dgm::GtkMenuChange change;
-        change.groupId = 0;
+        change.groupId = 777;
         change.menuId = 1;
         change.position = 2;
         change.added = {preferences};
@@ -69,8 +69,12 @@ public:
 public slots:
     void Start(const QList<uint> &groups, dgm::GtkMenuSectionList &content) const
     {
-        Q_UNUSED(groups);
-        content = sections;
+        content.clear();
+        for (const auto &section : sections) {
+            if (groups.contains(section.groupId)) {
+                content.append(section);
+            }
+        }
     }
 
     void End(const QList<uint> &groups)

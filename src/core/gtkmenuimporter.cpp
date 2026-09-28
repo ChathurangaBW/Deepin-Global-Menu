@@ -104,6 +104,7 @@ void GtkMenuImporter::refresh()
     }
 
     const quint64 serial = ++m_refreshSerial;
+    unsubscribeMenus();
     m_menuSections.clear();
     m_actionDescriptions.clear();
     m_pendingRequests = 0;
@@ -135,18 +136,19 @@ void GtkMenuImporter::refresh()
     }
 #endif
 
-    m_pendingRequests = menuPaths.size() + actionPaths.size();
-    if (m_pendingRequests == 0) {
-        setErrorString(QStringLiteral("GTK application exposes no candidate menu or action object paths"));
-        emit refreshFinished(false);
-        return;
-    }
-
     for (const auto &path : menuPaths) {
-        startMenuRequest(path, serial);
+        // GDBusMenuModel roots begin at group 0. Linked menu models may point
+        // at any uint group ID; those are discovered recursively from the
+        // returned :section/:submenu links rather than guessed.
+        startMenuGroupRequest(path, 0, serial);
     }
     for (const auto &path : actionPaths) {
         startActionRequest(path, serial);
+    }
+
+    if (m_pendingRequests == 0) {
+        setErrorString(QStringLiteral("GTK application exposes no candidate menu or action object paths"));
+        emit refreshFinished(false);
     }
 }
 
@@ -599,25 +601,25 @@ int GtkMenuImporter::registerAction(const QString &fullAction, const QVariant &t
     return id;
 }
 
-void GtkMenuImporter::startMenuRequest(const QString &path, quint64 serial)
+void GtkMenuImporter::startMenuGroupRequest(const QString &path,
+                                                  uint groupId,
+                                                  quint64 serial)
 {
+    auto &groupsForPath = m_startedMenuGroups[path];
+    if (groupsForPath.contains(groupId)) {
+        return;
+    }
+    groupsForPath.insert(groupId);
+    ++m_pendingRequests;
+
     QDBusInterface menus(m_context.busName,
                          path,
                          QString::fromLatin1(kGtkMenusInterface),
                          QDBusConnection::sessionBus());
 
-    QList<uint> groups;
-    groups.reserve(256);
-    for (uint group = 0; group < 256; ++group) {
-        groups.append(group);
-    }
-
-    if (m_startedMenuPaths.contains(path)) {
-        menus.asyncCall(QStringLiteral("End"), QVariant::fromValue(groups));
-    }
-    m_startedMenuPaths.insert(path);
-
-    const auto call = menus.asyncCall(QStringLiteral("Start"), QVariant::fromValue(groups));
+    const QList<uint> groups{groupId};
+    const auto call = menus.asyncCall(QStringLiteral("Start"),
+                                      QVariant::fromValue(groups));
     auto *watcher = new QDBusPendingCallWatcher(call, this);
     connect(watcher, &QDBusPendingCallWatcher::finished,
             this,
@@ -630,8 +632,14 @@ void GtkMenuImporter::startMenuRequest(const QString &path, quint64 serial)
                 }
 
                 if (!reply.isError()) {
-                    m_menuSections.insert(path, reply.value());
+                    const auto sections = reply.value();
+                    mergeMenuSections(path, sections);
                     m_hadSuccessfulRequest = true;
+
+                    const auto linkedGroups = linkedMenuGroups(sections);
+                    for (const uint linkedGroup : linkedGroups) {
+                        startMenuGroupRequest(path, linkedGroup, serial);
+                    }
                 }
                 requestFinished(serial);
             });
@@ -639,6 +647,8 @@ void GtkMenuImporter::startMenuRequest(const QString &path, quint64 serial)
 
 void GtkMenuImporter::startActionRequest(const QString &path, quint64 serial)
 {
+    ++m_pendingRequests;
+
     QDBusInterface actions(m_context.busName,
                            path,
                            QString::fromLatin1(kGtkActionsInterface),
@@ -662,6 +672,47 @@ void GtkMenuImporter::startActionRequest(const QString &path, quint64 serial)
                 }
                 requestFinished(serial);
             });
+}
+
+void GtkMenuImporter::mergeMenuSections(const QString &path,
+                                            const GtkMenuSectionList &sections)
+{
+    auto &stored = m_menuSections[path];
+
+    for (const auto &section : sections) {
+        bool replaced = false;
+        for (auto &existing : stored) {
+            if (existing.groupId == section.groupId
+                && existing.menuId == section.menuId) {
+                existing = section;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            stored.append(section);
+        }
+    }
+}
+
+QSet<uint> GtkMenuImporter::linkedMenuGroups(
+    const GtkMenuSectionList &sections) const
+{
+    QSet<uint> groups;
+
+    for (const auto &section : sections) {
+        for (const auto &item : section.items) {
+            GtkMenuLink link;
+            if (parseMenuLink(item.value(QStringLiteral(":section")), link)) {
+                groups.insert(link.groupId);
+            }
+            if (parseMenuLink(item.value(QStringLiteral(":submenu")), link)) {
+                groups.insert(link.groupId);
+            }
+        }
+    }
+
+    return groups;
 }
 
 void GtkMenuImporter::requestFinished(quint64 serial)
@@ -807,25 +858,30 @@ void GtkMenuImporter::disconnectRemoteSignals()
 
 void GtkMenuImporter::unsubscribeMenus()
 {
-    if (!m_context.isValid() || m_startedMenuPaths.isEmpty()) {
-        m_startedMenuPaths.clear();
+    if (!m_context.isValid() || m_startedMenuGroups.isEmpty()) {
+        m_startedMenuGroups.clear();
         return;
     }
 
-    QList<uint> groups;
-    groups.reserve(256);
-    for (uint group = 0; group < 256; ++group) {
-        groups.append(group);
-    }
+    for (auto it = m_startedMenuGroups.cbegin();
+         it != m_startedMenuGroups.cend();
+         ++it) {
+        QList<uint> groups;
+        groups.reserve(it.value().size());
+        for (const uint group : it.value()) {
+            groups.append(group);
+        }
+        if (groups.isEmpty()) {
+            continue;
+        }
 
-    for (const auto &path : std::as_const(m_startedMenuPaths)) {
         QDBusInterface menus(m_context.busName,
-                             path,
+                             it.key(),
                              QString::fromLatin1(kGtkMenusInterface),
                              QDBusConnection::sessionBus());
         menus.asyncCall(QStringLiteral("End"), QVariant::fromValue(groups));
     }
-    m_startedMenuPaths.clear();
+    m_startedMenuGroups.clear();
 }
 
 void GtkMenuImporter::clear()
@@ -834,6 +890,7 @@ void GtkMenuImporter::clear()
     m_menuSections.clear();
     m_actionDescriptions.clear();
     m_actions.clear();
+    m_startedMenuGroups.clear();
     m_items.clear();
     m_revision = 0;
     m_nextActionId = 1;

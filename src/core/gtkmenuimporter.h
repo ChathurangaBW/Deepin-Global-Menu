@@ -119,8 +119,10 @@ private:
                                 const GtkActionDescription &description);
 
     int registerAction(const QString &fullAction, const QVariant &target);
-    void startMenuRequest(const QString &path, quint64 serial);
+    void startMenuGroupRequest(const QString &path, uint groupId, quint64 serial);
     void startActionRequest(const QString &path, quint64 serial);
+    void mergeMenuSections(const QString &path, const GtkMenuSectionList &sections);
+    QSet<uint> linkedMenuGroups(const GtkMenuSectionList &sections) const;
     void requestFinished(quint64 serial);
     void finishRefresh(quint64 serial);
     void connectRemoteSignals();
@@ -133,7 +135,7 @@ private:
     QHash<QString, GtkMenuSectionList> m_menuSections;
     QHash<QString, GtkActionDescriptionMap> m_actionDescriptions;
     QHash<int, ActionTarget> m_actions;
-    QSet<QString> m_startedMenuPaths;
+    QHash<QString, QSet<uint>> m_startedMenuGroups;
     QVariantList m_items;
     QString m_errorString;
     uint m_revision = 0;
