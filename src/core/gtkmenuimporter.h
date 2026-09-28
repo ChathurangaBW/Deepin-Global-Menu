@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 
 namespace dgm {
@@ -54,6 +55,7 @@ class GtkMenuImporter final : public QObject
 
 public:
     explicit GtkMenuImporter(QObject *parent = nullptr);
+    ~GtkMenuImporter() override;
 
     void setContext(const GtkMenuContext &context);
     [[nodiscard]] const GtkMenuContext &context() const;
@@ -70,6 +72,15 @@ signals:
     void layoutChanged();
     void errorStringChanged();
     void refreshFinished(bool success);
+
+private slots:
+    void onGtkMenusChanged(const dgm::GtkMenuChangeList &changes);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    void onGtkActionsChanged(const QStringList &removed,
+                             const dgm::GtkActionEnabledMap &enabledChanged,
+                             const QVariantMap &stateChanged,
+                             const dgm::GtkActionDescriptionMap &added);
+#endif
 
 private:
     struct ActionTarget
@@ -112,6 +123,9 @@ private:
     void startActionRequest(const QString &path, quint64 serial);
     void requestFinished(quint64 serial);
     void finishRefresh(quint64 serial);
+    void connectRemoteSignals();
+    void disconnectRemoteSignals();
+    void unsubscribeMenus();
     void clear();
     void setErrorString(const QString &errorString);
 
@@ -119,6 +133,7 @@ private:
     QHash<QString, GtkMenuSectionList> m_menuSections;
     QHash<QString, GtkActionDescriptionMap> m_actionDescriptions;
     QHash<int, ActionTarget> m_actions;
+    QSet<QString> m_startedMenuPaths;
     QVariantList m_items;
     QString m_errorString;
     uint m_revision = 0;

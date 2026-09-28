@@ -12,6 +12,7 @@
 #include <QStringList>
 
 #include <initializer_list>
+#include <utility>
 
 namespace dgm {
 
@@ -46,6 +47,12 @@ GtkMenuImporter::GtkMenuImporter(QObject *parent)
     registerGtkMenuMetaTypes();
 }
 
+GtkMenuImporter::~GtkMenuImporter()
+{
+    disconnectRemoteSignals();
+    unsubscribeMenus();
+}
+
 void GtkMenuImporter::setContext(const GtkMenuContext &context)
 {
     const auto normalized = normalizedContext(context);
@@ -53,11 +60,14 @@ void GtkMenuImporter::setContext(const GtkMenuContext &context)
         return;
     }
 
+    disconnectRemoteSignals();
+    unsubscribeMenus();
     ++m_generation;
     ++m_refreshSerial;
     m_context = normalized;
     clear();
     setErrorString({});
+    connectRemoteSignals();
 }
 
 const GtkMenuContext &GtkMenuImporter::context() const
@@ -602,6 +612,11 @@ void GtkMenuImporter::startMenuRequest(const QString &path, quint64 serial)
         groups.append(group);
     }
 
+    if (m_startedMenuPaths.contains(path)) {
+        menus.asyncCall(QStringLiteral("End"), QVariant::fromValue(groups));
+    }
+    m_startedMenuPaths.insert(path);
+
     const auto call = menus.asyncCall(QStringLiteral("Start"), QVariant::fromValue(groups));
     auto *watcher = new QDBusPendingCallWatcher(call, this);
     connect(watcher, &QDBusPendingCallWatcher::finished,
@@ -660,6 +675,26 @@ void GtkMenuImporter::requestFinished(quint64 serial)
         finishRefresh(serial);
     }
 }
+
+void GtkMenuImporter::onGtkMenusChanged(const dgm::GtkMenuChangeList &changes)
+{
+    Q_UNUSED(changes);
+    refresh();
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+void GtkMenuImporter::onGtkActionsChanged(const QStringList &removed,
+                                          const dgm::GtkActionEnabledMap &enabledChanged,
+                                          const QVariantMap &stateChanged,
+                                          const dgm::GtkActionDescriptionMap &added)
+{
+    Q_UNUSED(removed);
+    Q_UNUSED(enabledChanged);
+    Q_UNUSED(stateChanged);
+    Q_UNUSED(added);
+    refresh();
+}
+#endif
 
 void GtkMenuImporter::finishRefresh(quint64 serial)
 {
@@ -720,6 +755,77 @@ void GtkMenuImporter::finishRefresh(quint64 serial)
         emit layoutChanged();
     }
     emit refreshFinished(m_ready);
+}
+
+void GtkMenuImporter::connectRemoteSignals()
+{
+    if (!m_context.isValid()) {
+        return;
+    }
+
+    auto bus = QDBusConnection::sessionBus();
+    bus.connect(m_context.busName,
+                QString(),
+                QString::fromLatin1(kGtkMenusInterface),
+                QStringLiteral("Changed"),
+                this,
+                SLOT(onGtkMenusChanged(dgm::GtkMenuChangeList)));
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    bus.connect(m_context.busName,
+                QString(),
+                QString::fromLatin1(kGtkActionsInterface),
+                QStringLiteral("Changed"),
+                this,
+                SLOT(onGtkActionsChanged(QStringList,dgm::GtkActionEnabledMap,QVariantMap,dgm::GtkActionDescriptionMap)));
+#endif
+}
+
+void GtkMenuImporter::disconnectRemoteSignals()
+{
+    if (!m_context.isValid()) {
+        return;
+    }
+
+    auto bus = QDBusConnection::sessionBus();
+    bus.disconnect(m_context.busName,
+                   QString(),
+                   QString::fromLatin1(kGtkMenusInterface),
+                   QStringLiteral("Changed"),
+                   this,
+                   SLOT(onGtkMenusChanged(dgm::GtkMenuChangeList)));
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    bus.disconnect(m_context.busName,
+                   QString(),
+                   QString::fromLatin1(kGtkActionsInterface),
+                   QStringLiteral("Changed"),
+                   this,
+                   SLOT(onGtkActionsChanged(QStringList,dgm::GtkActionEnabledMap,QVariantMap,dgm::GtkActionDescriptionMap)));
+#endif
+}
+
+void GtkMenuImporter::unsubscribeMenus()
+{
+    if (!m_context.isValid() || m_startedMenuPaths.isEmpty()) {
+        m_startedMenuPaths.clear();
+        return;
+    }
+
+    QList<uint> groups;
+    groups.reserve(256);
+    for (uint group = 0; group < 256; ++group) {
+        groups.append(group);
+    }
+
+    for (const auto &path : std::as_const(m_startedMenuPaths)) {
+        QDBusInterface menus(m_context.busName,
+                             path,
+                             QString::fromLatin1(kGtkMenusInterface),
+                             QDBusConnection::sessionBus());
+        menus.asyncCall(QStringLiteral("End"), QVariant::fromValue(groups));
+    }
+    m_startedMenuPaths.clear();
 }
 
 void GtkMenuImporter::clear()

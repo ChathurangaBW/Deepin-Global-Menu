@@ -53,6 +53,7 @@ struct GtkActionDescription
 };
 
 using GtkActionDescriptionMap = QMap<QString, GtkActionDescription>;
+using GtkActionEnabledMap = QMap<QString, bool>;
 using DbusVariantList = QList<QDBusVariant>;
 
 QDBusArgument &operator<<(QDBusArgument &argument, const GtkMenuLink &link);
@@ -78,4 +79,5 @@ Q_DECLARE_METATYPE(dgm::GtkMenuChange)
 Q_DECLARE_METATYPE(dgm::GtkMenuChangeList)
 Q_DECLARE_METATYPE(dgm::GtkActionDescription)
 Q_DECLARE_METATYPE(dgm::GtkActionDescriptionMap)
+Q_DECLARE_METATYPE(dgm::GtkActionEnabledMap)
 Q_DECLARE_METATYPE(dgm::DbusVariantList)

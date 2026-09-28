@@ -116,6 +116,7 @@ void registerGtkMenuMetaTypes()
         qRegisterMetaType<GtkMenuSectionList>("dgm::GtkMenuSectionList");
         qRegisterMetaType<GtkMenuChangeList>("dgm::GtkMenuChangeList");
         qRegisterMetaType<GtkActionDescriptionMap>("dgm::GtkActionDescriptionMap");
+        qRegisterMetaType<GtkActionEnabledMap>("dgm::GtkActionEnabledMap");
         qRegisterMetaType<DbusVariantList>("dgm::DbusVariantList");
 
         qDBusRegisterMetaType<GtkMenuLink>();
@@ -125,6 +126,7 @@ void registerGtkMenuMetaTypes()
         qDBusRegisterMetaType<GtkMenuChangeList>();
         qDBusRegisterMetaType<GtkActionDescription>();
         qDBusRegisterMetaType<GtkActionDescriptionMap>();
+        qDBusRegisterMetaType<GtkActionEnabledMap>();
         qDBusRegisterMetaType<DbusVariantList>();
         qDBusRegisterMetaType<QList<uint>>();
         return true;
