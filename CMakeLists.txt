@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(deepin-global-menu
-    VERSION 0.4.0
+    VERSION 0.4.1
     DESCRIPTION "Native global application menu for modern Deepin/DDE"
     LANGUAGES CXX
 )
@@ -49,3 +49,9 @@ if(DGM_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+install(FILES README.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+
+include(cmake/Packaging.cmake)
