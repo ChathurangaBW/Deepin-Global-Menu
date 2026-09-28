@@ -10,6 +10,8 @@
 
 DS_USE_NAMESPACE
 
+class DdeFallbackActions;
+
 class GlobalMenuApplet final : public DApplet
 {
     Q_OBJECT
@@ -27,4 +29,5 @@ private:
     dgm::MenuRegistry m_registry;
     dgm::AppMenuRegistrar m_registrar;
     dgm::ActiveWindowTracker *m_windowTracker = nullptr;
+    DdeFallbackActions *m_fallbackActions = nullptr;
 };

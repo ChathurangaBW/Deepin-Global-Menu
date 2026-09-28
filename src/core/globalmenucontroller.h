@@ -6,6 +6,7 @@
 #include "gtkmenutypes.h"
 #include "menuregistry.h"
 
+#include <QHash>
 #include <QObject>
 #include <QString>
 #include <QVariantList>
@@ -58,12 +59,14 @@ signals:
     void menuEndpointChanged();
     void menuItemsChanged();
     void menuStatusChanged();
+    void fallbackActionRequested(const QString &action);
 
 private:
     enum class Source {
         None,
         DbusMenu,
-        Gtk
+        Gtk,
+        Fallback
     };
 
     void setActiveWindowInfo(const ActiveWindowInfo &info);
@@ -71,6 +74,8 @@ private:
     void selectSource(Source source);
     GtkMenuContext gtkContextForActiveWindow() const;
     void tryGtkFallback();
+    void selectFallback();
+    void rebuildFallbackMenu();
 
     MenuRegistry *m_registry = nullptr;
     DbusMenuImporter *m_importer = nullptr;
@@ -78,6 +83,9 @@ private:
     ActiveWindowTracker *m_windowTracker = nullptr;
     ActiveWindowInfo m_activeWindowInfo;
     MenuEndpoint m_endpoint;
+    QVariantList m_fallbackItems;
+    QHash<int, QString> m_fallbackActions;
+    uint m_fallbackRevision = 0;
     Source m_source = Source::None;
 };
 

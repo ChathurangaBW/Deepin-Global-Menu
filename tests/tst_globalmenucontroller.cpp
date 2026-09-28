@@ -37,6 +37,11 @@ public:
         setActiveWindowId(windowId);
     }
 
+    void activateInfo(const dgm::ActiveWindowInfo &info)
+    {
+        setActiveWindowInfo(info);
+    }
+
 private:
     bool m_running = false;
 };
@@ -47,6 +52,7 @@ class GlobalMenuControllerTest final : public QObject
 
 private slots:
     void followsTrackerAndRegistry();
+    void providesSafeFallbackMenu();
 };
 
 void GlobalMenuControllerTest::followsTrackerAndRegistry()
@@ -72,7 +78,9 @@ void GlobalMenuControllerTest::followsTrackerAndRegistry()
 
     tracker.activate(7);
     QCOMPARE(controller.activeWindowId(), 7U);
-    QVERIFY(!controller.hasMenu());
+    QVERIFY(controller.hasMenu());
+    QCOMPARE(controller.menuSource(), QStringLiteral("fallback"));
+    QVERIFY(controller.menuReady());
 
     registry.registerWindow(7,
                             QStringLiteral(":1.7"),
@@ -85,6 +93,44 @@ void GlobalMenuControllerTest::followsTrackerAndRegistry()
     tracker.stop();
     QCOMPARE(controller.activeWindowId(), 0U);
     QVERIFY(!controller.hasMenu());
+}
+
+void GlobalMenuControllerTest::providesSafeFallbackMenu()
+{
+    dgm::MenuRegistry registry;
+    dgm::GlobalMenuController controller(&registry);
+    FakeActiveWindowTracker tracker;
+    controller.setActiveWindowTracker(&tracker);
+
+    dgm::ActiveWindowInfo info;
+    info.nativeId = 77;
+    info.appId = QStringLiteral("org.example.Editor.desktop");
+    info.appName = QStringLiteral("Example Editor");
+    info.backend = QStringLiteral("treeland");
+    tracker.activateInfo(info);
+
+    QCOMPARE(controller.menuSource(), QStringLiteral("fallback"));
+    QVERIFY(controller.hasMenu());
+    QVERIFY(controller.menuReady());
+
+    const auto top = controller.menuItems();
+    QCOMPARE(top.size(), 2);
+
+    const auto applicationMenu = top.constFirst().toMap();
+    QCOMPARE(applicationMenu.value(QStringLiteral("label")).toString(),
+             QStringLiteral("Example Editor"));
+
+    const auto children = applicationMenu.value(QStringLiteral("children")).toList();
+    QVERIFY(children.size() >= 4);
+
+    QSignalSpy actionSpy(&controller,
+                         &dgm::GlobalMenuController::fallbackActionRequested);
+    controller.triggerMenuAction(
+        children.constFirst().toMap().value(QStringLiteral("id")).toInt());
+
+    QCOMPARE(actionSpy.count(), 1);
+    QCOMPARE(actionSpy.takeFirst().constFirst().toString(),
+             QStringLiteral("new-instance"));
 }
 
 QTEST_GUILESS_MAIN(GlobalMenuControllerTest)

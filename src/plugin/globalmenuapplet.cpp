@@ -3,6 +3,7 @@
 #include "globalmenuapplet.h"
 
 #include "ddeactivewindowtracker.h"
+#include "ddefallbackactions.h"
 #include "globalmenucontroller.h"
 
 #include <pluginfactory.h>
@@ -14,6 +15,7 @@ GlobalMenuApplet::GlobalMenuApplet(QObject *parent)
     : DApplet(parent)
     , m_registry(this)
     , m_registrar(&m_registry, this)
+    , m_fallbackActions(new DdeFallbackActions(this))
 {
     if (QGuiApplication::platformName() == QStringLiteral("wayland")) {
         m_windowTracker = new DdeActiveWindowTracker(this);
@@ -44,6 +46,8 @@ QObject *GlobalMenuApplet::createProxyMeta()
 {
     auto *controller = new dgm::GlobalMenuController(&m_registry, this);
     controller->setActiveWindowTracker(m_windowTracker);
+    connect(controller, &dgm::GlobalMenuController::fallbackActionRequested,
+            m_fallbackActions, &DdeFallbackActions::execute);
     return controller;
 }
 

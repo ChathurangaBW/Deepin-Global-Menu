@@ -65,10 +65,14 @@ GlobalMenuController::GlobalMenuController(MenuRegistry *registry, QObject *pare
                 }
             });
     connect(m_gtkImporter, &GtkMenuImporter::refreshFinished,
-            this, [this](bool) {
-                if (m_source == Source::Gtk) {
-                    emit menuStatusChanged();
+            this, [this](bool success) {
+                if (m_source != Source::Gtk) {
+                    return;
                 }
+                if (!success) {
+                    selectFallback();
+                }
+                emit menuStatusChanged();
             });
 }
 
@@ -131,6 +135,8 @@ QString GlobalMenuController::menuSource() const
         return QStringLiteral("dbusmenu");
     case Source::Gtk:
         return QStringLiteral("gtk");
+    case Source::Fallback:
+        return QStringLiteral("fallback");
     case Source::None:
         break;
     }
@@ -144,6 +150,8 @@ bool GlobalMenuController::hasMenu() const
         return m_endpoint.isValid();
     case Source::Gtk:
         return m_gtkImporter->context().isValid();
+    case Source::Fallback:
+        return m_activeWindowInfo.isValid();
     case Source::None:
         break;
     }
@@ -182,6 +190,8 @@ bool GlobalMenuController::menuReady() const
         return m_importer->isReady();
     case Source::Gtk:
         return m_gtkImporter->isReady();
+    case Source::Fallback:
+        return !m_fallbackItems.isEmpty();
     case Source::None:
         break;
     }
@@ -195,6 +205,8 @@ uint GlobalMenuController::menuRevision() const
         return m_importer->revision();
     case Source::Gtk:
         return m_gtkImporter->revision();
+    case Source::Fallback:
+        return m_fallbackRevision;
     case Source::None:
         break;
     }
@@ -208,6 +220,8 @@ QVariantList GlobalMenuController::menuItems() const
         return m_importer->topLevelItems();
     case Source::Gtk:
         return m_gtkImporter->topLevelItems();
+    case Source::Fallback:
+        return m_fallbackItems;
     case Source::None:
         break;
     }
@@ -221,6 +235,8 @@ QString GlobalMenuController::menuError() const
         return m_importer->errorString();
     case Source::Gtk:
         return m_gtkImporter->errorString();
+    case Source::Fallback:
+        return {};
     case Source::None:
         break;
     }
@@ -236,6 +252,9 @@ void GlobalMenuController::refreshMenu()
     case Source::Gtk:
         m_gtkImporter->refresh();
         break;
+    case Source::Fallback:
+        rebuildFallbackMenu();
+        break;
     case Source::None:
         break;
     }
@@ -250,6 +269,13 @@ void GlobalMenuController::triggerMenuAction(int itemId, uint timestamp)
     case Source::Gtk:
         m_gtkImporter->triggerAction(itemId);
         break;
+    case Source::Fallback: {
+        const auto action = m_fallbackActions.value(itemId);
+        if (!action.isEmpty()) {
+            emit fallbackActionRequested(action);
+        }
+        break;
+    }
     case Source::None:
         break;
     }
@@ -263,6 +289,9 @@ void GlobalMenuController::prepareSubmenu(int itemId)
         break;
     case Source::Gtk:
         m_gtkImporter->prepareSubmenu(itemId);
+        break;
+    case Source::Fallback:
+        Q_UNUSED(itemId);
         break;
     case Source::None:
         break;
@@ -310,7 +339,7 @@ void GlobalMenuController::refreshSource()
             selectSource(Source::Gtk);
             m_gtkImporter->refresh();
         } else {
-            selectSource(Source::None);
+            selectFallback();
         }
     }
 
@@ -352,16 +381,120 @@ void GlobalMenuController::tryGtkFallback()
 {
     const auto context = gtkContextForActiveWindow();
     if (!context.isValid() && context.applicationId.isEmpty()) {
+        selectFallback();
         return;
     }
 
     m_gtkImporter->setContext(context);
     if (!m_gtkImporter->context().isValid()) {
+        selectFallback();
         return;
     }
 
     selectSource(Source::Gtk);
     m_gtkImporter->refresh();
+}
+
+void GlobalMenuController::selectFallback()
+{
+    if (!m_activeWindowInfo.isValid()) {
+        m_fallbackItems.clear();
+        m_fallbackActions.clear();
+        selectSource(Source::None);
+        return;
+    }
+
+    rebuildFallbackMenu();
+    selectSource(Source::Fallback);
+}
+
+void GlobalMenuController::rebuildFallbackMenu()
+{
+    m_fallbackActions.clear();
+
+    int nextId = 900000;
+    auto actionItem = [this, &nextId](const QString &label, const QString &action) {
+        QVariantMap item;
+        const int id = ++nextId;
+        item.insert(QStringLiteral("id"), id);
+        item.insert(QStringLiteral("label"), label);
+        item.insert(QStringLiteral("enabled"), true);
+        item.insert(QStringLiteral("visible"), true);
+        item.insert(QStringLiteral("separator"), false);
+        item.insert(QStringLiteral("children"), QVariantList{});
+        m_fallbackActions.insert(id, action);
+        return item;
+    };
+
+    auto separator = [&nextId] {
+        QVariantMap item;
+        item.insert(QStringLiteral("id"), ++nextId);
+        item.insert(QStringLiteral("separator"), true);
+        item.insert(QStringLiteral("enabled"), false);
+        item.insert(QStringLiteral("visible"), true);
+        item.insert(QStringLiteral("children"), QVariantList{});
+        return item;
+    };
+
+    QString applicationLabel = m_activeWindowInfo.appName;
+    if (applicationLabel.isEmpty()) {
+        applicationLabel = m_activeWindowInfo.appId;
+    }
+    if (applicationLabel.endsWith(QStringLiteral(".desktop"), Qt::CaseInsensitive)) {
+        applicationLabel.chop(8);
+    }
+    if (applicationLabel.isEmpty()) {
+        applicationLabel = QStringLiteral("Application");
+    }
+
+    QVariantList applicationChildren;
+    applicationChildren.append(actionItem(QStringLiteral("New Window"),
+                                          QStringLiteral("new-instance")));
+    applicationChildren.append(actionItem(QStringLiteral("Show All Windows"),
+                                          QStringLiteral("show-windows")));
+    applicationChildren.append(separator());
+    applicationChildren.append(actionItem(QStringLiteral("Quit"),
+                                          QStringLiteral("quit")));
+    applicationChildren.append(actionItem(QStringLiteral("Force Quit"),
+                                          QStringLiteral("force-quit")));
+
+    QVariantMap applicationMenu;
+    applicationMenu.insert(QStringLiteral("id"), ++nextId);
+    applicationMenu.insert(QStringLiteral("label"), applicationLabel);
+    applicationMenu.insert(QStringLiteral("enabled"), true);
+    applicationMenu.insert(QStringLiteral("visible"), true);
+    applicationMenu.insert(QStringLiteral("separator"), false);
+    applicationMenu.insert(QStringLiteral("children-display"), QStringLiteral("submenu"));
+    applicationMenu.insert(QStringLiteral("children"), applicationChildren);
+
+    QVariantList windowChildren;
+    windowChildren.append(actionItem(QStringLiteral("Minimize / Next Window"),
+                                     QStringLiteral("activate-toggle")));
+    windowChildren.append(actionItem(QStringLiteral("Show All Windows"),
+                                     QStringLiteral("show-windows")));
+    windowChildren.append(separator());
+    windowChildren.append(actionItem(QStringLiteral("Close All Windows"),
+                                     QStringLiteral("quit")));
+
+    QVariantMap windowMenu;
+    windowMenu.insert(QStringLiteral("id"), ++nextId);
+    windowMenu.insert(QStringLiteral("label"), QStringLiteral("Window"));
+    windowMenu.insert(QStringLiteral("enabled"), true);
+    windowMenu.insert(QStringLiteral("visible"), true);
+    windowMenu.insert(QStringLiteral("separator"), false);
+    windowMenu.insert(QStringLiteral("children-display"), QStringLiteral("submenu"));
+    windowMenu.insert(QStringLiteral("children"), windowChildren);
+
+    const QVariantList nextItems = {applicationMenu, windowMenu};
+    if (m_fallbackItems == nextItems) {
+        return;
+    }
+
+    m_fallbackItems = nextItems;
+    ++m_fallbackRevision;
+    if (m_source == Source::Fallback) {
+        emit menuItemsChanged();
+    }
 }
 
 } // namespace dgm

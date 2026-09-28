@@ -3,6 +3,8 @@
 add_library(ds-global-menu SHARED
     ddeactivewindowtracker.cpp
     ddeactivewindowtracker.h
+    ddefallbackactions.cpp
+    ddefallbackactions.h
     globalmenuapplet.cpp
     globalmenuapplet.h
 )

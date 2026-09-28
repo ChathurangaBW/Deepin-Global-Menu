@@ -189,6 +189,10 @@ void X11ActiveWindowTracker::refreshActiveWindow()
     info.x11Id = activeWindow;
     info.pid = readCardinalProperty(activeWindow, m_netWmPidAtom);
     info.appId = readStringProperty(activeWindow, m_gtkApplicationIdAtom);
+    if (info.appId.isEmpty()) {
+        info.appId = readWmClass(activeWindow);
+    }
+    info.appName = info.appId;
     info.title = readStringProperty(activeWindow, m_netWmNameAtom);
     if (info.title.isEmpty()) {
         info.title = readStringProperty(activeWindow, XCB_ATOM_WM_NAME);
@@ -254,6 +258,41 @@ QString X11ActiveWindowTracker::readStringProperty(xcb_window_t window, xcb_atom
     const QString value = length > 0 ? QString::fromUtf8(data, length) : QString{};
     std::free(reply);
     return value;
+}
+
+QString X11ActiveWindowTracker::readWmClass(xcb_window_t window) const
+{
+    if (!m_connection || window == XCB_WINDOW_NONE) {
+        return {};
+    }
+
+    const auto cookie = xcb_get_property(m_connection,
+                                         false,
+                                         window,
+                                         XCB_ATOM_WM_CLASS,
+                                         XCB_ATOM_STRING,
+                                         0,
+                                         1024);
+    xcb_generic_error_t *error = nullptr;
+    auto *reply = xcb_get_property_reply(m_connection, cookie, &error);
+    const bool hadError = error != nullptr;
+    std::free(error);
+
+    if (!reply || hadError || reply->format != 8) {
+        std::free(reply);
+        return {};
+    }
+
+    const int length = xcb_get_property_value_length(reply);
+    const auto *data = static_cast<const char *>(xcb_get_property_value(reply));
+    const QByteArray raw = length > 0 ? QByteArray(data, length) : QByteArray{};
+    std::free(reply);
+
+    const auto parts = raw.split('\0');
+    if (parts.size() > 1 && !parts.at(1).isEmpty()) {
+        return QString::fromUtf8(parts.at(1));
+    }
+    return !parts.isEmpty() ? QString::fromUtf8(parts.constFirst()) : QString{};
 }
 
 quint32 X11ActiveWindowTracker::readCardinalProperty(xcb_window_t window, xcb_atom_t atom) const

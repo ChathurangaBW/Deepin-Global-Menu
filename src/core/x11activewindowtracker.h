@@ -27,6 +27,7 @@ private:
     void refreshActiveWindow();
     xcb_atom_t internAtom(const char *name) const;
     QString readStringProperty(xcb_window_t window, xcb_atom_t atom) const;
+    QString readWmClass(xcb_window_t window) const;
     quint32 readCardinalProperty(xcb_window_t window, xcb_atom_t atom) const;
 
     xcb_connection_t *m_connection = nullptr;
