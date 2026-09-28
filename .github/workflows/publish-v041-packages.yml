@@ -1,0 +1,95 @@
+name: Publish v0.4.1 packages
+
+on:
+  push:
+    branches:
+      - agent/publish-v0.4.1
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download packages built from merged main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh run download 36454100845 \
+            --repo "${{ github.repository }}" \
+            --name deepin-global-menu-packages \
+            --dir release-assets
+
+      - name: Verify package set and checksums
+        run: |
+          set -euo pipefail
+          test -f release-assets/deepin-global-menu_0.4.1_amd64.deb
+          test -f release-assets/deepin-global-menu_0.4.1_amd64.deb.sha256
+          test -f release-assets/deepin-global-menu-0.4.1-1.x86_64.rpm
+          test -f release-assets/deepin-global-menu-0.4.1-1.x86_64.rpm.sha256
+          cd release-assets
+          sha256sum -c deepin-global-menu_0.4.1_amd64.deb.sha256
+          sha256sum -c deepin-global-menu-0.4.1-1.x86_64.rpm.sha256
+
+      - name: Write release notes
+        run: |
+          cat > RELEASE_NOTES.md <<'EOF'
+          # Deepin Global Menu v0.4.1
+
+          This release adds normal installable packages so users do not need to compile the project from source.
+
+          ## Recommended install on Deepin 25
+
+          Download `deepin-global-menu_0.4.1_amd64.deb` and run:
+
+          ```bash
+          sudo apt install ./deepin-global-menu_0.4.1_amd64.deb
+          ```
+
+          The package installs the DDE Shell global-menu applet and the `dgm-inspect` diagnostic utility.
+
+          ## RPM package
+
+          `deepin-global-menu-0.4.1-1.x86_64.rpm` is also provided for compatible RPM-based DDE environments:
+
+          ```bash
+          sudo dnf install ./deepin-global-menu-0.4.1-1.x86_64.rpm
+          ```
+
+          Deepin itself is Debian-based, so the `.deb` is the primary package. RPM runtime compatibility depends on matching DDE Shell and Qt ABIs.
+
+          ## Validation
+
+          Packages were built from commit `4404fc31c28455e923383468ead99c94e77a3b70` in the official `linuxdeepin/deepin:25` container.
+
+          CI verified:
+          - full plugin configure/build;
+          - unit and D-Bus integration tests;
+          - DEB package generation;
+          - RPM package generation;
+          - both package payloads contain the DDE applet and `dgm-inspect`;
+          - actual installation of the generated DEB inside Deepin 25;
+          - execution of installed `dgm-inspect --help`.
+
+          SHA-256 checksum files are attached for both packages.
+          EOF
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v0.4.1 \
+            --repo "${{ github.repository }}" \
+            --target "4404fc31c28455e923383468ead99c94e77a3b70" \
+            --title "Deepin Global Menu v0.4.1" \
+            --notes-file RELEASE_NOTES.md \
+            release-assets/deepin-global-menu_0.4.1_amd64.deb \
+            release-assets/deepin-global-menu_0.4.1_amd64.deb.sha256 \
+            release-assets/deepin-global-menu-0.4.1-1.x86_64.rpm \
+            release-assets/deepin-global-menu-0.4.1-1.x86_64.rpm.sha256
