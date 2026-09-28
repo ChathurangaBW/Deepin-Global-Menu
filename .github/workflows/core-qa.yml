@@ -125,7 +125,7 @@ jobs:
         run: |
           set -euo pipefail
           deb="$(find package-out -maxdepth 1 -name '*.deb' -print -quit)"
-          apt-get install -y "$deb"
+          apt-get install -y "$(realpath "$deb")"
           command -v dgm-inspect
           dgm-inspect --help
 
