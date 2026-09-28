@@ -612,7 +612,8 @@ void GtkMenuImporter::startMenuGroupRequest(const QString &path,
     groupsForPath.insert(groupId);
     ++m_pendingRequests;
 
-    QDBusInterface menus(m_context.busName,
+    const QString busName = m_context.busName;
+    QDBusInterface menus(busName,
                          path,
                          QString::fromLatin1(kGtkMenusInterface),
                          QDBusConnection::sessionBus());
@@ -623,11 +624,22 @@ void GtkMenuImporter::startMenuGroupRequest(const QString &path,
     auto *watcher = new QDBusPendingCallWatcher(call, this);
     connect(watcher, &QDBusPendingCallWatcher::finished,
             this,
-            [this, watcher, serial, path](QDBusPendingCallWatcher *) {
+            [this, watcher, serial, path, busName, groupId](QDBusPendingCallWatcher *) {
                 QDBusPendingReply<GtkMenuSectionList> reply = *watcher;
                 watcher->deleteLater();
 
                 if (serial != m_refreshSerial) {
+                    // A context switch or a newer refresh may have sent End
+                    // before this asynchronous Start reached the exporter.
+                    // End the exact late subscription once Start completes.
+                    QDBusInterface staleMenus(
+                        busName,
+                        path,
+                        QString::fromLatin1(kGtkMenusInterface),
+                        QDBusConnection::sessionBus());
+                    staleMenus.asyncCall(
+                        QStringLiteral("End"),
+                        QVariant::fromValue(QList<uint>{groupId}));
                     return;
                 }
 

@@ -5,6 +5,7 @@
 #include "gtkmenutypes.h"
 #include "menuregistry.h"
 
+#include <QDBusConnection>
 #include <QDBusObjectPath>
 #include <QSignalSpy>
 #include <QtTest>
